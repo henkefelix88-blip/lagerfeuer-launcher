@@ -249,6 +249,99 @@ function joinPartyDialog() {
   });
 }
 
+// ===================== Tailscale =====================
+// Spielen übers Internet ohne Portfreigabe: Status anzeigen, mit einem Klick installieren, anmelden, Freunde einladen.
+const ts = { status: null, busy: null, pollUntil: 0 };
+
+async function refreshTailscale() {
+  try { ts.status = await api.tailscaleStatus(); } catch { ts.status = { installed: false, state: 'error' }; }
+  for (const el of $$('.ts-slot')) { el.innerHTML = tsCardHtml(); bindTsCard(el); }
+  return ts.status;
+}
+
+function tsCardHtml() {
+  const s = ts.status;
+  let dot = '#9aa7b8', title = 'Tailscale wird geprüft …', text = '', buttons = '';
+  if (s?.state === 'unsupported') return '';
+  if (ts.busy) { dot = '#ffd25a'; title = 'Tailscale wird eingerichtet …'; text = ts.busy; }
+  else if (s && !s.installed) {
+    dot = '#e2534a'; title = 'Tailscale ist nicht installiert';
+    text = 'Damit spielt ihr übers Internet <b>ohne Portfreigabe</b> – wie in einem gemeinsamen LAN. Jeder Mitspieler braucht es einmal.';
+    buttons = '<button class="btn primary small" data-ts="install">Tailscale installieren</button>';
+  } else if (s && !s.running) {
+    dot = '#ffd25a'; title = s.state === 'NeedsLogin' ? 'Tailscale: Anmeldung nötig' : 'Tailscale ist installiert, aber nicht verbunden';
+    text = 'Melde dich einmal an (Google, Microsoft, GitHub …). Danach verbindet sich Tailscale automatisch mit Windows.';
+    buttons = '<button class="btn primary small" data-ts="login">Anmelden / Verbinden</button>';
+  } else if (s?.running) {
+    dot = '#6abf4b'; title = `Tailscale verbunden – deine Adresse: ${esc(s.ip || '?')}`;
+    const online = (s.peers || []).filter((p) => p.online);
+    text = online.length ? `Im selben Netz online: ${online.map((p) => esc(p.name)).join(', ')}` : 'Noch keine anderen Geräte online. Lade deine Freunde in dein Tailnet ein (oder alle melden sich mit demselben Konto an).';
+    buttons = '<button class="btn small" data-ts="invite">Freunde einladen</button>';
+  }
+  return `<div class="ts-card"><span class="ts-dot" style="background:${dot}"></span><div class="grow"><b>${title}</b><div class="muted" style="font-size:12px">${text}</div></div>${buttons}<button class="btn small" data-ts="refresh" title="Status aktualisieren"><span data-icon="refresh"></span></button></div>`;
+}
+
+function bindTsCard(root) {
+  fillIcons(root);
+  for (const b of $$('[data-ts]', root)) b.onclick = () => tailscaleAction(b.dataset.ts);
+}
+
+async function tailscaleAction(action) {
+  audio.click();
+  try {
+    if (action === 'install') {
+      ts.busy = 'Lade den offiziellen Installer von tailscale.com …';
+      refreshTailscale();
+      await api.tailscaleInstall();
+      ts.busy = 'Installer gestartet – bitte im Windows-Fenster „Ja“ klicken und die Installation abschließen.';
+      refreshTailscale();
+      toast('Tailscale-Installer gestartet. Danach hier auf „Anmelden“ klicken.');
+      pollTailscale();
+    } else if (action === 'login') {
+      const r = await api.tailscaleLogin();
+      toast(r.alreadyUp ? 'Tailscale ist verbunden.' : 'Anmeldeseite im Browser geöffnet – nach dem Login verbindet sich Tailscale automatisch.');
+      pollTailscale();
+    } else if (action === 'invite') {
+      await api.tailscaleInvite();
+      toast('Tailscale-Verwaltung im Browser geöffnet: Unter „Users“ → „Invite users“ deine Freunde einladen.');
+    } else await refreshTailscale();
+  } catch (err) {
+    ts.busy = null;
+    toast(cleanError(err), true);
+    refreshTailscale();
+  }
+}
+
+/** Nach Installation/Anmeldung einige Minuten lang den Status nachfragen. */
+function pollTailscale() {
+  ts.pollUntil = Date.now() + 5 * 60 * 1000;
+  const tick = async () => {
+    const before = ts.status?.state;
+    const s = await refreshTailscale();
+    if (s.installed && ts.busy) { ts.busy = null; refreshTailscale(); toast('Tailscale ist installiert! Jetzt anmelden.'); }
+    if (s.running && before !== 'Running') { toast(`Tailscale verbunden (${s.ip}). Beim Party-Erstellen wird diese Adresse automatisch gewählt.`); renderParty(); return; }
+    if (Date.now() < ts.pollUntil) setTimeout(tick, 3000);
+  };
+  setTimeout(tick, 3000);
+}
+
+/** Einmalige Frage beim ersten Start. */
+async function maybeAskTailscale() {
+  if (state.settings.tailscale?.prompted) return;
+  const s = await refreshTailscale();
+  if (s.state === 'unsupported' || s.running) return updateSettings((x) => (x.tailscale = { prompted: true }));
+  openModal(`
+    <h2>Mit Freunden übers Internet spielen?</h2>
+    <p style="margin:0">Am einfachsten geht das mit <b>Tailscale</b> (kostenlos): Es verbindet eure PCs wie in einem gemeinsamen Heimnetz – <b>ohne Portfreigabe am Router</b>.</p>
+    <div class="hint">Der Launcher lädt den offiziellen Installer von tailscale.com, prüft dessen digitale Signatur und startet ihn. Windows fragt dabei nach Administrator-Rechten. Danach meldest du dich einmal an.</div>
+    <div class="actions"><button class="btn" id="later">Später</button><button class="btn primary" id="go">${s.installed ? 'Jetzt anmelden' : 'Tailscale installieren'}</button></div>`,
+  (m) => {
+    const done = () => { updateSettings((x) => (x.tailscale = { prompted: true })); closeModal(); };
+    $('#later', m).onclick = () => { done(); toast('Du findest Tailscale jederzeit unter Party oder Einstellungen.'); };
+    $('#go', m).onclick = () => { done(); tailscaleAction(s.installed ? 'login' : 'install'); };
+  });
+}
+
 // ===================== Party =====================
 async function joinParty(address, port, password, hostToken) {
   await state.party.connect({ address, port, name: state.settings.playerName, password, hostToken });
@@ -339,6 +432,7 @@ async function renderParty() {
     const ifaces = await api.networkInterfaces();
     const net = state.settings.network;
     view.innerHTML = `
+      <div class="ts-slot" style="max-width:980px;margin:0 auto 20px">${tsCardHtml()}</div>
       <div class="party-start">
         <div class="panel">
           <h2>Party erstellen</h2>
@@ -353,7 +447,7 @@ async function renderParty() {
             <label class="field grow">Party-Port<input type="number" id="c-port" value="${net.partyPort}" min="1024" max="65535"></label>
             <label class="field grow">Passwort (empfohlen)<input type="password" id="c-pass" maxlength="64"></label>
           </div>
-          <div class="hint">Im LAN oder mit Tailscale/ZeroTier funktioniert es sofort. Übers Internet: Ports ${net.partyPort} (Party) und ${net.gamePort} (Spiel) per TCP freigeben und „öffentliche IP“ wählen.</div>
+          <div class="hint">${ifaces.some((i) => i.kind === 'Tailscale') ? 'Tailscale ist aktiv – deine Freunde brauchen nur Tailscale (im selben Netz) und den Code.' : `Im LAN oder mit Tailscale funktioniert es sofort. Ohne Tailscale übers Internet: Ports ${net.partyPort} (Party) und ${net.gamePort} (Spiel) per TCP freigeben und „öffentliche IP“ wählen.`}</div>
           <button class="btn primary big" id="c-go"><span data-icon="plus"></span>Party erstellen</button>
         </div>
         <div class="panel">
@@ -365,6 +459,8 @@ async function renderParty() {
         </div>
       </div>`;
     fillIcons(view);
+    bindTsCard($('.ts-slot', view));
+    if (!ts.status) refreshTailscale();
     $('#c-addr').onchange = () => $('#c-manual').classList.toggle('hidden', $('#c-addr').value !== 'manual');
     if (!ifaces.length) { $('#c-addr').value = 'manual'; $('#c-manual').classList.remove('hidden'); }
     $('#c-go').onclick = async () => {
@@ -485,6 +581,10 @@ async function renderSettings() {
   const slider = (id, label, val) => `<div class="slider-row"><span>${label}</span><input type="range" id="${id}" min="0" max="100" value="${Math.round(val * 100)}"><span id="${id}-v">${Math.round(val * 100)}%</span></div>`;
   view.innerHTML = `
     <div class="settings">
+      <div class="panel" style="grid-column: 1 / -1">
+        <h2>Online spielen (Tailscale)</h2>
+        <div class="ts-slot">${tsCardHtml()}</div>
+      </div>
       <div class="panel">
         <h2>Spieler</h2>
         <label class="field">Spielername<input type="text" id="s-name" maxlength="20" value="${esc(s.playerName)}"></label>
@@ -532,6 +632,8 @@ async function renderSettings() {
       </div>
     </div>`;
   fillIcons(view);
+  bindTsCard($('.ts-slot', view));
+  refreshTailscale();
 
   $('#s-name').oninput = (e) => updateSettings((x) => (x.playerName = e.target.value.slice(0, 20) || 'Spieler'));
   for (const [id, key] of [['s-master', 'master'], ['s-music', 'music'], ['s-sfx', 'sfx']]) {
@@ -614,6 +716,11 @@ async function init() {
     state.settings = s;
     audio.apply(s.audio);
   });
+  api.onTailscaleProgress((p) => {
+    ts.busy = p.step === 'download' ? `Lade Tailscale herunter … ${Math.round((p.p || 0) * 100)} %` : p.step === 'verify' ? 'Prüfe die digitale Signatur von Tailscale …' : 'Starte den Installer …';
+    for (const el of $$('.ts-slot')) { el.innerHTML = tsCardHtml(); bindTsCard(el); }
+  });
+  maybeAskTailscale();
 }
 
 init().catch((err) => {

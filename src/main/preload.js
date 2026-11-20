@@ -25,6 +25,13 @@ contextBridge.exposeInMainWorld('launcher', {
   screenResolutions: () => ipcRenderer.invoke('system:resolutions'),
   openGamesFolder: () => ipcRenderer.invoke('games:openFolder'),
 
+  // Tailscale
+  tailscaleStatus: () => ipcRenderer.invoke('tailscale:status'),
+  tailscaleInstall: () => ipcRenderer.invoke('tailscale:install'),
+  tailscaleLogin: () => ipcRenderer.invoke('tailscale:login'),
+  tailscaleInvite: () => ipcRenderer.invoke('tailscale:invite'),
+  onTailscaleProgress: (cb) => ipcRenderer.on('tailscale:progress', (_e, p) => cb(p)),
+
   // Party (Server läuft im Main-Prozess, die Lobby-Verbindung macht der Renderer per WebSocket)
   hostParty: (opts) => ipcRenderer.invoke('party:host', opts),
   stopParty: () => ipcRenderer.invoke('party:stop'),

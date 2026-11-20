@@ -145,6 +145,11 @@ input[type=checkbox] { accent-color: var(--fire); width: 18px; height: 18px; }
 .keycap { min-width: 120px; background: #1a212a; border: 2px solid var(--line); border-bottom-width: 4px; padding: 5px 10px; border-radius: var(--radius); cursor: pointer; font-weight: 700; }
 .keycap.listening { border-color: var(--fire); color: var(--fire); }
 
+/* ---------- Tailscale-Karte ---------- */
+.ts-card { display: flex; align-items: center; gap: 14px; background: var(--panel); border-radius: var(--radius); padding: 14px 16px; border-bottom: 3px solid #1a212a; }
+.settings .ts-card { background: var(--panel-2); }
+.ts-dot { width: 14px; height: 14px; flex: none; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+
 /* ---------- Modal & Toasts ---------- */
 .modal-backdrop { position: fixed; inset: 0; z-index: 10; background: rgba(10, 14, 19, .72); display: grid; place-items: center; }
 .modal { width: 480px; max-width: calc(100% - 32px); background: var(--panel); border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; gap: 14px; border-bottom: 4px solid #151b22; }

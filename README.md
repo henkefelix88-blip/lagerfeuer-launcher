@@ -242,10 +242,23 @@ New-NetFirewallRule -DisplayName "Lagerfeuer Launcher" -Direction Inbound -Proto
 
 Hinweise: Manche Anschlüsse (DS-Lite, Mobilfunk, CGNAT) erlauben keine Portfreigabe für IPv4. Dann ist ein VPN die Lösung.
 
-### Ohne Portfreigabe: Tailscale oder ZeroTier (empfohlen)
+### Ohne Portfreigabe: Tailscale (im Launcher eingebaut, empfohlen)
 Damit seid ihr in einem gemeinsamen virtuellen LAN, und Portfreigaben entfallen komplett.
-- **Tailscale** (<https://tailscale.com>): auf allen PCs installieren, mit demselben Konto oder per Einladung ins selbe „Tailnet“.
-  Die Tailscale-IP beginnt mit `100.` und wird im Launcher automatisch als **„Tailscale“** angeboten.
+
+**Der Launcher richtet Tailscale für dich ein:**
+1. Beim **ersten Start** fragt der Launcher: „Mit Freunden übers Internet spielen?“ → **„Tailscale installieren“**.
+   Jederzeit möglich ist das auch unter **Party** oder **Einstellungen → Online spielen (Tailscale)**.
+2. Der Launcher lädt den **offiziellen Installer** von `pkgs.tailscale.com`, **prüft die digitale Signatur**
+   (muss gültig und von „Tailscale Inc.“ sein – sonst wird abgebrochen) und startet ihn. Windows fragt nach Admin-Rechten → **„Ja“**.
+3. Danach **„Anmelden / Verbinden“** klicken: Die Tailscale-Login-Seite öffnet sich im Browser (Google-, Microsoft-, GitHub-Konto …).
+4. **Alle müssen im selben Tailscale-Netz („Tailnet“) sein:** Entweder meldet ihr euch alle mit demselben Konto an, oder der Host
+   klickt auf **„Freunde einladen“** (öffnet die Tailscale-Verwaltung → *Users → Invite users*).
+5. Die Karte zeigt dann **„Tailscale verbunden – deine Adresse: 100.x.x.x“** und welche Freunde online sind.
+   Beim Party-Erstellen wird die Tailscale-Adresse **automatisch vorausgewählt**.
+
+Tailscale wird nie ohne deinen Klick installiert. Deinstallieren geht wie bei jedem Programm über *Windows-Einstellungen → Apps*.
+
+Alternativ geht auch:
 - **ZeroTier** (<https://www.zerotier.com>): Netzwerk anlegen, alle treten mit der Netzwerk-ID bei, im Web-Panel freischalten.
   Die Adresse wird als **„ZeroTier“** angeboten.
 
@@ -357,6 +370,7 @@ Neue Spiele werden vom Test `tests/games.test.mjs` und vom Selbsttest automatisc
 src/
   main/                     ← Electron-Hauptprozess (Node)
     main.js                 Fenster, IPC, app://-Protokoll, Selbsttest
+    tailscale.js            Tailscale: Status, signaturgeprüfter Installer, Anmeldung
     settings.js             Einstellungen laden/speichern
     gameRegistry.js         Spiele über game.json finden
     gameServerManager.js    Host-Server eines Spiels starten/stoppen
@@ -409,7 +423,7 @@ npm run build -- --zip
 ```
 
 - `npm start` startet den Launcher im Entwicklungsmodus.
-- `npm test` führt 29 automatische Tests aus: Party-Code, Map/Gebäude/Kollision/Raycasts, Einstellungen, Registry,
+- `npm test` führt 31 automatische Tests aus: Party-Code, Tailscale-Erkennung, Map/Gebäude/Kollision/Raycasts, Einstellungen, Registry,
   Blumenfeld-Arena-Server (Passwort, Treffer → Kill → Respawn, Bots, Chat + Cheat-Codes, Messer, Raketen, Items), den Party-Ablauf
   (Beitritt, Passwort, Leistungscheck → stärkster PC hostet, Start → alle werden geholt) sowie **jeden Spielserver**
   (Beitritt, Passwort, Zustand, Bots, Chat), Kritzel & Raten (Lösung bleibt geheim) und den Vier-in-Reihe-Computergegner.

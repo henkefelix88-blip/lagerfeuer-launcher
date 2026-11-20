@@ -20,6 +20,7 @@ const { SettingsStore } = require('./settings');
 const { GameRegistry } = require('./gameRegistry');
 const { GameServerManager } = require('./gameServerManager');
 const { PartyServer } = require('./party/partyServer');
+const tailscale = require('./tailscale');
 
 const SELFTEST = process.argv.includes('--selftest');
 const LAUNCHER_DIR = path.join(__dirname, '..', 'launcher');
@@ -49,6 +50,8 @@ const SELFTEST_DIR = path.join(os.tmpdir(), 'lagerfeuer-selftest');
 if (SELFTEST) {
   fs.mkdirSync(SELFTEST_DIR, { recursive: true });
   // Eigenes Profil, damit der Selbsttest die echten Einstellungen des Spielers nicht verändert.
+  // Jedes Mal frisch (wie ein echter erster Start), damit z. B. die Tailscale-Frage geprüft wird.
+  fs.rmSync(path.join(SELFTEST_DIR, 'profile'), { recursive: true, force: true });
   app.setPath('userData', path.join(SELFTEST_DIR, 'profile'));
   fs.writeFileSync(path.join(SELFTEST_DIR, 'selftest.log'), '');
 }
@@ -182,7 +185,7 @@ function listInterfaces() {
       let kind = 'LAN';
       let rank = 0; // kleiner = wahrscheinlicher die richtige Adresse
       const [p1, p2, p3] = a.address.split('.').map(Number);
-      if (p1 === 100 && p2 >= 64 && p2 <= 127) { kind = 'Tailscale'; rank = 1; }
+      if (p1 === 100 && p2 >= 64 && p2 <= 127) { kind = 'Tailscale'; rank = -1; } // verbunden → bevorzugt (funktioniert auch übers Internet)
       else if (/zerotier/i.test(name)) { kind = 'ZeroTier'; rank = 1; }
       else if (/hamachi|radmin/i.test(name) || p1 === 25 || p1 === 26) { kind = 'VPN'; rank = 2; }
       else if (/vethernet|virtualbox|vmware|hyper-v|wsl|docker|loopback/i.test(name) || (p1 === 192 && p2 === 168 && p3 === 56) || (p1 === 172 && p2 >= 16 && p2 <= 31)) {
@@ -239,6 +242,16 @@ function registerIpc() {
   }));
   ipcMain.handle('system:resolutions', () => listResolutions());
   ipcMain.handle('net:interfaces', () => listInterfaces());
+
+  // --- Tailscale (Spielen übers Internet ohne Portfreigabe) ---
+  ipcMain.handle('tailscale:status', () => tailscale.status());
+  ipcMain.handle('tailscale:install', async (e) => {
+    const r = await tailscale.install({ onProgress: (p) => e.sender.send('tailscale:progress', p), openPath: (f) => shell.openPath(f) });
+    log(`[Tailscale] Installer gestartet (Signatur: ${r.signer})`);
+    return { ok: true };
+  });
+  ipcMain.handle('tailscale:login', () => tailscale.login((url) => shell.openExternal(url)));
+  ipcMain.handle('tailscale:invite', () => shell.openExternal('https://login.tailscale.com/admin/users'));
 
   // --- Party ---
   ipcMain.handle('party:host', async (_e, { port, password, gameId }) => {
@@ -310,6 +323,14 @@ async function runSelftest() {
     const ui = (js) => launcherWin.webContents.executeJavaScript(js);
     const shot = async (name, win = launcherWin) => fs.writeFileSync(path.join(outDir, name), (await win.webContents.capturePage()).toPNG());
     await wait(2500);
+    // Erststart-Frage zu Tailscale (eigenes, frisches Profil → muss erscheinen, außer Tailscale läuft schon)
+    const tsState = await tailscale.status();
+    const prompt = await ui("!document.getElementById('modal-backdrop').classList.contains('hidden') && document.querySelector('#modal h2')?.textContent || ''");
+    log(`[Selbsttest] Tailscale: ${tsState.state} · Erststart-Frage: ${prompt || '(keine)'}`);
+    if (!tsState.running && tsState.state !== 'unsupported' && !prompt) selftestErrors.push('Tailscale-Frage beim ersten Start fehlt');
+    await shot('tailscale-prompt.png');
+    await ui("document.getElementById('later')?.click()");
+    await wait(400);
     await shot('launcher.png');
     if (!registry.list().length) throw new Error('Keine Spiele gefunden');
     const only = (process.argv.find((a) => a.startsWith('--selftest-only=')) || '').split('=')[1];
@@ -326,7 +347,11 @@ async function runSelftest() {
 
     // 2) Party über die Oberfläche erstellen (Port 0 = freier Port), Leistungscheck abwarten
     await ui("document.querySelector('[data-view=party]').click()");
-    await wait(800);
+    await wait(1200);
+    await shot('party-start.png');
+    const card = await ui("document.querySelector('.ts-card b')?.textContent || ''");
+    log(`[Selbsttest] Tailscale-Karte: ${card}`);
+    if (!card && tsState.state !== 'unsupported') selftestErrors.push('Tailscale-Karte im Party-Bereich fehlt');
     await ui("document.getElementById('c-port').value = '27999'; document.getElementById('c-pass').value = 'test'; document.getElementById('c-go').click()");
     await wait(4000);
     const lobby = await ui("JSON.stringify({ code: document.querySelector('.code')?.textContent, members: document.querySelectorAll('.member').length, perf: document.querySelector('.member .sub')?.textContent })");

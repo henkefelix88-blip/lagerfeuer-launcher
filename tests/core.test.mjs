@@ -112,6 +112,30 @@ test('Einstellungen: Speichern, Laden, Standardwerte ergänzen', () => {
   assert.equal(again.unbekannt, undefined);
 });
 
+test('Tailscale: Status wird richtig erkannt', () => {
+  const { parseStatus } = require('../src/main/tailscale.js');
+  const running = parseStatus(JSON.stringify({
+    BackendState: 'Running',
+    Self: { HostName: 'Gaming-PC', UserID: 7, TailscaleIPs: ['100.101.102.103', 'fd7a:115c::1'] },
+    User: { 7: { LoginName: 'tester@example.com' } },
+    Peer: { a: { HostName: 'Freund-PC', TailscaleIPs: ['100.64.0.9'], Online: true }, b: { HostName: 'Laptop', TailscaleIPs: ['100.64.0.10'], Online: false } },
+  }));
+  assert.equal(running.running, true);
+  assert.equal(running.ip, '100.101.102.103');
+  assert.equal(running.account, 'tester@example.com');
+  assert.deepEqual(running.peers.filter((p) => p.online).map((p) => p.name), ['Freund-PC']);
+  const login = parseStatus(JSON.stringify({ BackendState: 'NeedsLogin', Self: { TailscaleIPs: [] } }));
+  assert.equal(login.running, false);
+  assert.equal(login.state, 'NeedsLogin');
+  assert.equal(parseStatus('kaputt').state, 'error');
+});
+
+test('Tailscale: Erkennung auf diesem PC liefert einen gültigen Zustand', async () => {
+  const { status } = require('../src/main/tailscale.js');
+  const s = await status();
+  assert.ok(['NotInstalled', 'Running', 'NeedsLogin', 'Stopped', 'NeedsMachineAuth', 'Starting', 'error', 'unsupported'].includes(s.state), s.state);
+});
+
 test('Registry findet das Spiel über game.json', () => {
   const { GameRegistry } = require('../src/main/gameRegistry.js');
   const reg = new GameRegistry([join(root, 'games')]);

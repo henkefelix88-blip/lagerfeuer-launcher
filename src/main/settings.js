@@ -36,6 +36,7 @@ const DEFAULTS = {
   graphics: { resolution: '1600x900', displayMode: 'window', fpsLimit: 144, quality: 'medium' },
   controls: { sensitivity: 1.0, invertY: false, fov: 80, keybinds: { ...DEFAULT_KEYBINDS } },
   network: { lastAddress: '', gamePort: 27015, partyPort: 27016 },
+  tailscale: { prompted: false }, // Erststart-Frage "Tailscale installieren?" schon gezeigt?
 };
 
 /** Tiefes Zusammenführen: Werte aus `src` überschreiben `base`, unbekannte Typen werden verworfen. */

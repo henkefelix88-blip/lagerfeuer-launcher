@@ -17,7 +17,7 @@ const IGNORE = [/^\/games($|\/)/, /^\/dist($|\/)/, /^\/release($|\/)/, /^\/tests
 console.log('Baue App …');
 const [appDir] = await packager({
   dir: root,
-  out: join(root, 'dist'),
+  out: join(root, 'dist', `v${pkg.version}`), // eigener Ordner je Version → eine laufende ältere Version blockiert den Build nicht
   overwrite: true,
   platform: 'win32',
   arch: 'x64',
