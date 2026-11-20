@@ -1,0 +1,21 @@
+{
+  "id": "vier",
+  "name": "Vier in Reihe",
+  "version": "1.0.0",
+  "tagline": "Der Klassiker – gegen Freunde oder den Computer",
+  "description": "Bring vier Steine deiner Farbe in eine Reihe – waagerecht, senkrecht oder diagonal. Spiel gegen einen Freund oder gegen den Computer; weitere Spieler schauen zu und sind danach dran.",
+  "client": "client/index.html",
+  "server": "server/server.mjs",
+  "icon": "icon.svg",
+  "cover": "cover.svg",
+  "accent": "#5b8def",
+  "modes": [
+    "singleplayer",
+    "multiplayer",
+    "party"
+  ],
+  "maxPlayers": 8,
+  "defaultPort": 27028,
+  "supportsBots": true,
+  "turnBased": true
+}

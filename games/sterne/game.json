@@ -1,0 +1,20 @@
+{
+  "id": "sterne",
+  "name": "Sternenjäger",
+  "version": "1.0.0",
+  "tagline": "Gemeinsam gegen Asteroiden und Drohnen",
+  "description": "Koop-Weltraum-Shooter: Steuert eure Raumschiffe mit WASD, zielt mit der Maus und überlebt gemeinsam immer stärkere Wellen aus Asteroiden und Drohnen.",
+  "client": "client/index.html",
+  "server": "server/server.mjs",
+  "icon": "icon.svg",
+  "cover": "cover.svg",
+  "accent": "#7f8cff",
+  "modes": [
+    "singleplayer",
+    "multiplayer",
+    "party"
+  ],
+  "maxPlayers": 8,
+  "defaultPort": 27027,
+  "supportsBots": true
+}

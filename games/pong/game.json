@@ -1,0 +1,20 @@
+{
+  "id": "pong",
+  "name": "Viereck-Pong",
+  "version": "1.0.0",
+  "tagline": "Pong für vier – auf jeder Seite einer",
+  "description": "Vier Spieler, vier Seiten, ein (oder zwei) Bälle. Verteidige deine Seite, wer alle 5 Leben verliert, wird zur Wand. Deine Seite ist immer unten.",
+  "client": "client/index.html",
+  "server": "server/server.mjs",
+  "icon": "icon.svg",
+  "cover": "cover.svg",
+  "accent": "#ffd25a",
+  "modes": [
+    "singleplayer",
+    "multiplayer",
+    "party"
+  ],
+  "maxPlayers": 8,
+  "defaultPort": 27025,
+  "supportsBots": true
+}

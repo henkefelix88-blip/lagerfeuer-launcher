@@ -1,0 +1,21 @@
+{
+  "id": "parkour",
+  "name": "Parkour",
+  "version": "1.0.0",
+  "tagline": "3D-Jump-&-Run-Rennen über schwebende Plattformen",
+  "description": "Sprinte, springe und doppelspringe über drei Strecken: Blumenwiese, Wolkenpfad und Lavaturm. Bewegliche und verschwindende Plattformen, Sprungpads und Checkpoints – wer zuerst durchs Ziel-Portal läuft, bekommt die meisten Punkte.",
+  "client": "client/index.html",
+  "server": "server/server.mjs",
+  "icon": "icon.svg",
+  "cover": "cover.svg",
+  "accent": "#3fd0c9",
+  "modes": [
+    "singleplayer",
+    "multiplayer",
+    "party"
+  ],
+  "maxPlayers": 16,
+  "defaultPort": 27022,
+  "supportsBots": true,
+  "order": 3
+}

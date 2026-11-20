@@ -1,0 +1,26 @@
+{
+  "name": "lagerfeuer-launcher",
+  "productName": "Lagerfeuer Launcher",
+  "version": "1.2.0",
+  "description": "Modularer Game-Launcher mit Party-System und 10 Spielen.",
+  "main": "src/main/main.js",
+  "author": "Lagerfeuer",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "selftest": "electron . --selftest",
+    "test": "node --test --test-concurrency=1 tests/core.test.mjs tests/network.test.mjs tests/games.test.mjs",
+    "vendor": "node scripts/vendor-three.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "ws": "8.23.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "45.4.1",
+    "three": "0.187.0"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "snake-oi",
+  "name": "Snake Oi",
+  "version": "1.0.0",
+  "tagline": "Klassisches Snake trifft Online-Arena",
+  "description": "Friss Äpfel und leuchtende Happen, werde die längste Schlange der Wiese! Lenke mit der Maus oder ganz klassisch mit den Pfeiltasten, gib mit Leertaste Boost und bring andere Schlangen dazu, mit dem Kopf in dich hineinzufahren – dann zerfallen sie zu Futter.",
+  "client": "client/index.html",
+  "server": "server/server.mjs",
+  "icon": "icon.svg",
+  "cover": "cover.svg",
+  "accent": "#6abf4b",
+  "modes": [
+    "singleplayer",
+    "multiplayer",
+    "party"
+  ],
+  "maxPlayers": 16,
+  "defaultPort": 27021,
+  "supportsBots": true,
+  "order": 2
+}

@@ -1,0 +1,20 @@
+{
+  "id": "panzer",
+  "name": "Panzerduell",
+  "version": "1.0.0",
+  "tagline": "Abprallende Geschosse, enge Gassen",
+  "description": "Top-Down-Panzerschlacht für bis zu 12 Spieler: Fahre mit WASD, ziele mit der Maus und lass deine Geschosse um die Ecke abprallen. Sammle Schild, Dreifachschuss und Turbo-Ketten ein.",
+  "client": "client/index.html",
+  "server": "server/server.mjs",
+  "icon": "icon.svg",
+  "cover": "cover.svg",
+  "accent": "#9aa0a8",
+  "modes": [
+    "singleplayer",
+    "multiplayer",
+    "party"
+  ],
+  "maxPlayers": 12,
+  "defaultPort": 27023,
+  "supportsBots": true
+}

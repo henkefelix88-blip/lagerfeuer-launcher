@@ -1,0 +1,20 @@
+{
+  "id": "rennen",
+  "name": "Turbo-Rennen",
+  "version": "1.0.0",
+  "tagline": "Drei Runden, Vollgas, Driften",
+  "description": "Top-Down-Rennen über eine kurvige Strecke durch die Blumenwiese. Driften in den Kurven, Boost-Felder und Rempeln erlaubt – wer zuerst drei Runden schafft, gewinnt.",
+  "client": "client/index.html",
+  "server": "server/server.mjs",
+  "icon": "icon.svg",
+  "cover": "cover.svg",
+  "accent": "#e85934",
+  "modes": [
+    "singleplayer",
+    "multiplayer",
+    "party"
+  ],
+  "maxPlayers": 8,
+  "defaultPort": 27026,
+  "supportsBots": true
+}

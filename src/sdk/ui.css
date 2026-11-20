@@ -1,0 +1,38 @@
+/* Lagerfeuer Spiele-SDK – gemeinsamer HUD-/Menü-Stil (gleiche Palette wie Launcher und Blumenfeld Arena) */
+:root { --fire: #f08c32; --flame: #ffd25a; --grass: #6abf4b; --danger: #e2534a; --panel: rgba(27, 34, 44, .78); }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #1b222c; color: #f2f5f8; font: 14px/1.4 'Segoe UI', system-ui, sans-serif; user-select: none; }
+canvas#game { display: block; width: 100vw; height: 100vh; }
+.sdk-hidden { display: none !important; }
+#sdk-hud { position: fixed; inset: 0; pointer-events: none; }
+#sdk-info { position: absolute; right: 12px; bottom: 8px; font-size: 11px; color: rgba(255,255,255,.7); text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+#sdk-msgs { position: absolute; left: 50%; top: 70px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#sdk-msgs div { background: var(--panel); padding: 5px 12px; border-radius: 3px; font-weight: 600; }
+#sdk-chat { position: absolute; left: 16px; bottom: 16px; width: 400px; display: flex; flex-direction: column; gap: 4px; }
+#sdk-chat-log { max-height: 200px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
+#sdk-chat-log .line { background: rgba(27, 34, 44, .65); padding: 3px 8px; border-radius: 3px; font-size: 13px; transition: opacity .5s; word-wrap: break-word; }
+#sdk-chat-log .line.faded { opacity: 0; }
+#sdk-chat-input { display: none; pointer-events: auto; background: rgba(20, 26, 34, .92); border: 2px solid var(--fire); color: #fff; padding: 8px 10px; border-radius: 3px; font: 14px 'Segoe UI', sans-serif; outline: none; user-select: text; }
+#sdk-chat.open #sdk-chat-input { display: block; }
+#sdk-board { position: fixed; left: 50%; top: 12%; transform: translateX(-50%); width: 520px; background: rgba(27, 34, 44, .94); padding: 18px 22px; border-radius: 4px; border-bottom: 4px solid rgba(0,0,0,.4); }
+#sdk-board h2 { margin: 0 0 10px; font-size: 17px; letter-spacing: .08em; }
+#sdk-board table { width: 100%; border-collapse: collapse; }
+#sdk-board th { text-align: left; font-size: 11px; letter-spacing: .15em; color: #9aa7b8; padding: 4px 6px; }
+#sdk-board td { padding: 6px; border-top: 1px solid rgba(255,255,255,.07); font-weight: 600; }
+#sdk-board tr.me td { background: rgba(240, 140, 50, .18); }
+.dot { width: 12px; height: 12px; display: inline-block; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+#sdk-overlay { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(20, 26, 34, .6); z-index: 10; }
+#sdk-overlay .card { width: 460px; background: #232c38; border-radius: 4px; padding: 26px; display: flex; flex-direction: column; gap: 14px; border-bottom: 4px solid #151b22; }
+.logo-row { display: flex; gap: 14px; align-items: center; }
+.sdk-logo { width: 52px; height: 52px; background: var(--fire); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.logo-row h1 { margin: 0; font-size: 22px; letter-spacing: .1em; text-transform: uppercase; }
+#sdk-status { color: #9aa7b8; }
+#sdk-menu { display: flex; flex-direction: column; gap: 12px; }
+.sdk-vol { display: flex; flex-direction: column; font-size: 12px; font-weight: 700; color: #9aa7b8; }
+.sdk-vol input { accent-color: var(--fire); }
+.sdk-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 14px; font-size: 12px; color: #c4ccd6; background: #1b222c; padding: 10px; border-radius: 4px; }
+.sdk-keys b { color: var(--flame); }
+.sdk-btn { padding: 11px 16px; border: 0; border-radius: 4px; font: 700 14px 'Segoe UI', sans-serif; cursor: pointer; background: #2b3644; color: #e8ecf1; border-bottom: 3px solid #1d2631; }
+.sdk-btn:hover { filter: brightness(1.15); }
+.sdk-btn.primary { background: var(--fire); color: #2a1404; border-bottom-color: #b45f1c; }
+.sdk-btn.danger { background: var(--danger); color: #2a0806; border-bottom-color: #9c3029; }

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' app:; script-src 'self' app: 'sha256-97+kjoH86NZivbifDahnY0/XrUFXZ5U7hnab8lXSmCk='; style-src 'self' 'unsafe-inline' app:; img-src 'self' app: data: blob:; connect-src ws: wss:" />
+  <title>Parkour</title>
+  <link rel="stylesheet" href="app://sdk/ui.css" />
+  <script type="importmap">{ "imports": { "three": "app://sdk/vendor/three.module.js" } }</script>
+  <style>
+    #pk-hud { position: fixed; inset: 0; pointer-events: none; font-weight: 700; }
+    #pk-top { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); display: flex; gap: 10px; }
+    #pk-top div { background: rgba(27,34,44,.78); padding: 6px 14px; border-radius: 3px; border-bottom: 3px solid rgba(0,0,0,.3); }
+    #pk-top b { color: #ffd25a; }
+    #pk-center { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); font-size: 64px; font-weight: 900; text-shadow: 0 4px 0 rgba(0,0,0,.35); text-align: center; }
+    #pk-center small { display: block; font-size: 20px; }
+    #pk-places { position: absolute; right: 16px; top: 16px; background: rgba(27,34,44,.78); padding: 10px 14px; border-radius: 3px; min-width: 200px; font-size: 13px; }
+    #pk-places h3 { margin: 0 0 6px; font-size: 11px; letter-spacing: .15em; color: #9aa7b8; }
+    #pk-jumps { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; gap: 6px; }
+    #pk-jumps i { width: 16px; height: 16px; background: #ffd25a; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+    #pk-jumps i.used { background: rgba(255,255,255,.2); }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="pk-hud">
+    <div id="pk-top"><div id="pk-level">–</div><div>Zeit <b id="pk-time">0:00</b></div><div>Checkpoint <b id="pk-cp">0/0</b></div></div>
+    <div id="pk-center"></div>
+    <div id="pk-places"><h3>ZIELEINLAUF</h3><div id="pk-list">–</div></div>
+    <div id="pk-jumps"><i></i><i></i></div>
+  </div>
+  <script type="module" src="game.js"></script>
+</body>
+</html>

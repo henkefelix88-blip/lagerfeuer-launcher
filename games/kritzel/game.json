@@ -1,0 +1,20 @@
+{
+  "id": "kritzel",
+  "name": "Kritzel & Raten",
+  "version": "1.0.0",
+  "tagline": "Einer malt, alle raten",
+  "description": "Partyspiel ab 2 Spielern: Reihum malt einer einen Begriff, alle anderen raten im Chat. Je schneller du richtig rätst, desto mehr Punkte – auch der Maler wird belohnt.",
+  "client": "client/index.html",
+  "server": "server/server.mjs",
+  "icon": "icon.svg",
+  "cover": "cover.svg",
+  "accent": "#ef7aa8",
+  "modes": [
+    "multiplayer",
+    "party"
+  ],
+  "maxPlayers": 12,
+  "defaultPort": 27029,
+  "supportsBots": false,
+  "turnBased": true
+}

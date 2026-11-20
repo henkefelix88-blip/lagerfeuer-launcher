@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' app:; script-src 'self' app: 'sha256-+mly31C+QQSAeXrtrKLIXFjPzAin+3Nu2O5/lqJcZv8='; style-src 'self' 'unsafe-inline' app:; img-src 'self' app: data: blob:; connect-src ws: wss:" />
+  <title>Blumenfeld Arena</title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="ink"></div>
+    <div id="scope" class="hidden"><div class="lens"></div><i class="h"></i><i class="v"></i><i class="dot"></i></div>
+    <div id="screen-flash"></div>
+    <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i></div>
+    <div id="hitmarker"></div>
+    <div id="damage-vignette"></div>
+    <div id="damage-dir"></div>
+    <div id="spawn-protect" class="hidden">Spawnschutz</div>
+
+    <div id="killfeed"></div>
+    <div id="messages"></div>
+    <div id="buffs"></div>
+    <div id="item-box" class="empty"><div id="item-icon"></div><div id="item-name"></div></div>
+    <div id="cheat-badge" class="hidden"></div>
+    <div id="chat"><div id="chat-log"></div><input id="chat-input" maxlength="120" placeholder="Nachricht … (Enter senden, Esc abbrechen)" autocomplete="off" /></div>
+
+    <div id="health-box">
+      <div class="label">LEBEN <span id="hp-max"></span></div>
+      <div class="row"><span id="hp-value">100</span><div class="bar"><div id="hp-bar"></div></div></div>
+      <div class="stamina"><div id="stamina-bar"></div></div>
+    </div>
+
+    <div id="ammo-box">
+      <div id="weapon-name">Pistole</div>
+      <div class="row"><span id="ammo-mag">12</span><span id="ammo-res">/ 48</span></div>
+      <div id="reload-hint" class="hidden">NACHLADEN [R]</div>
+      <div id="slots"></div>
+    </div>
+
+    <div id="info-top"><span id="ping">– ms</span> · <span id="fps">– FPS</span></div>
+  </div>
+
+  <div id="scoreboard" class="hidden">
+    <h2>Blumenfeld Arena <small>Jeder gegen jeden</small></h2>
+    <table><thead><tr><th></th><th>Spieler</th><th>Kills</th><th>Tode</th><th>K/D</th><th>Ping</th></tr></thead><tbody id="score-rows"></tbody></table>
+  </div>
+
+  <div id="death" class="hidden">
+    <div class="title">ERWISCHT</div>
+    <div id="death-by"></div>
+    <div id="death-timer"></div>
+  </div>
+
+  <div id="overlay">
+    <div class="card">
+      <div class="logo-row">
+        <svg viewBox="0 0 64 64" width="56" height="56"><polygon points="32,2 58,17 58,47 32,62 6,47 6,17" fill="#2c3848"/><polygon points="32,10 37,26 54,26 40,36 45,52 32,42 19,52 24,36 10,26 27,26" fill="#ffd84d"/><circle cx="32" cy="32" r="6" fill="#f08c32"/></svg>
+        <div><h1>BLUMENFELD ARENA</h1><div id="status">Verbinde …</div></div>
+      </div>
+      <div id="menu" class="hidden">
+        <button id="btn-resume" class="btn primary">Weiterspielen</button>
+        <div class="quick">
+          <label>Maus-Empfindlichkeit <span id="q-sens-v"></span><input type="range" id="q-sens" min="10" max="400"></label>
+          <label>Master-Lautstärke <span id="q-vol-v"></span><input type="range" id="q-vol" min="0" max="100"></label>
+        </div>
+        <div class="keys" id="keys-help"></div>
+        <button id="btn-quit" class="btn danger">Zurück zum Launcher</button>
+      </div>
+      <button id="btn-error-quit" class="btn hidden">Zurück zum Launcher</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
