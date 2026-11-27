@@ -4,7 +4,7 @@
  * inkl. begehbarer Gebäude, Kollision und Raycasts. Server und Client sehen dadurch exakt dieselbe Map.
  */
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 export const MAP_HALF = 180; // Map ist 360 × 360 m
 export const PLAYER_RADIUS = 0.45;
 export const EYE_HEIGHT = 1.6;
@@ -34,7 +34,22 @@ export const WEAPONS = {
   sniper: { id: 'sniper', name: 'Scharfschützengewehr', damage: 90, rate: 1.4, mag: 5, reserve: 20, reload: 2.8, spread: 0.07, adsSpread: 0.0004, pellets: 1, range: 400, auto: false, falloff: 400, recoil: 0.08, zoom: 4.5, headMul: 2, scope: true },
   rocket: { id: 'rocket', name: 'Raketenwerfer', damage: 120, rate: 1.1, mag: 1, reserve: 8, reload: 1.9, spread: 0.004, adsSpread: 0.002, pellets: 1, range: 250, auto: false, falloff: 999, recoil: 0.07, zoom: 1.4, headMul: 1, projectile: 'rocket' },
 };
-export const WEAPON_ORDER = ['knife', 'pistol', 'smg', 'rifle', 'shotgun', 'sniper', 'rocket'];
+// Streitkolben (nur per Chat-Befehl /mace): Nahkampf, im Fallen trifft er umso härter ("Smash")
+WEAPONS.mace = { id: 'mace', name: 'Streitkolben', damage: 26, rate: 0.6, mag: 0, reserve: 0, reload: 0, spread: 0, adsSpread: 0, pellets: 1, range: 3.0, auto: false, falloff: 99, recoil: 0, zoom: 1, melee: true, headMul: 1.2, smash: true };
+export const WEAPON_ORDER = ['knife', 'pistol', 'smg', 'rifle', 'shotgun', 'sniper', 'rocket', 'mace'];
+
+/** Windladung (Taste F, mit /mace unendlich): fliegt geradeaus, platzt und schleudert alle in der Nähe weg – auch dich selbst. */
+export const WIND = { speed: 34, radius: 4, up: 16, push: 12, cooldown: 0.45, damage: 2, life: 3 };
+export const SMASH_MIN_FALL = 1.5; // ab dieser Fallhöhe (m) zählt ein Streitkolben-Treffer als Smash
+
+/** Zusatzschaden für Smash-Angriffe je nach Fallhöhe (erste 3 m stark, dann schwächer ansteigend). */
+export function smashBonus(fall) {
+  if (fall < SMASH_MIN_FALL) return 0;
+  const a = Math.min(fall, 3) * 16;
+  const b = Math.max(0, Math.min(fall, 8) - 3) * 8;
+  const c = Math.max(0, fall - 8) * 4;
+  return Math.round(a + b + c);
+}
 export const ROCKET = { speed: 48, radius: 6, selfDamage: 0.5, knockback: 16 };
 
 /**

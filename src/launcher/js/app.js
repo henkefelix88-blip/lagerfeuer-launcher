@@ -249,6 +249,38 @@ function joinPartyDialog() {
   });
 }
 
+// ===================== Auto-Update =====================
+let upd = { status: 'idle' };
+function renderUpdate() {
+  const chip = $('#update-chip');
+  const show = ['downloading', 'ready'].includes(upd.status);
+  chip.classList.toggle('hidden', !show);
+  chip.classList.toggle('ready', upd.status === 'ready');
+  if (upd.status === 'downloading') chip.innerHTML = `Update ${esc(upd.version)} wird geladen <span class="bar"><i style="width:${Math.round(upd.progress * 100)}%"></i></span>`;
+  else if (upd.status === 'ready') chip.innerHTML = `<span data-icon="refresh"></span>Update ${esc(upd.version)} – jetzt neu starten`;
+  fillIcons(chip);
+  const st = $('#s-update-status');
+  if (st) {
+    st.textContent = {
+      idle: '–', checking: 'Suche nach Updates …', uptodate: `Du hast die neueste Version (${upd.current}).`,
+      downloading: `Lade Version ${upd.version} … ${Math.round(upd.progress * 100)} %`, ready: `Version ${upd.version} ist bereit – wird beim nächsten Neustart eingespielt.`,
+      error: `Update-Fehler: ${upd.error}`, dev: 'Entwicklungsmodus – Updates nur in der fertigen .exe.', installing: 'Update wird eingespielt …',
+    }[upd.status] || '';
+    $('#s-update-now')?.classList.toggle('hidden', upd.status !== 'ready');
+  }
+}
+function confirmUpdate() {
+  if (state.gameRunning) return toast('Bitte zuerst das laufende Spiel beenden.', true);
+  openModal(`
+    <h2>Auf Version ${esc(upd.version)} aktualisieren?</h2>
+    <p style="margin:0">Der Launcher startet kurz neu. Einstellungen und eigene Spiele bleiben erhalten.${state.party.connected ? '<br><b>Du verlässt dabei die Party.</b>' : ''}</p>
+    <div class="actions"><button class="btn" id="u-later">Später</button><button class="btn green" id="u-go"><span data-icon="refresh"></span>Jetzt aktualisieren</button></div>`,
+  (m) => {
+    $('#u-later', m).onclick = () => { closeModal(); toast('Das Update wird beim nächsten Schließen des Launchers automatisch eingespielt.'); };
+    $('#u-go', m).onclick = async () => { try { await api.updateInstall(); } catch (err) { toast(cleanError(err), true); } };
+  });
+}
+
 // ===================== Tailscale =====================
 // Spielen übers Internet ohne Portfreigabe: Status anzeigen, mit einem Klick installieren, anmelden, Freunde einladen.
 const ts = { status: null, busy: null, pollUntil: 0 };
@@ -561,7 +593,7 @@ async function renderParty() {
 const KEY_LABELS = {
   forward: 'Vorwärts', back: 'Rückwärts', left: 'Links', right: 'Rechts', jump: 'Springen', sprint: 'Boost (Sprinten)',
   reload: 'Nachladen', fire: 'Schießen', aim: 'Zielen / Zoom', item: 'Item einsetzen', chat: 'Chat öffnen', sneak: 'Schleichen (Fliegen: runter)',
-  weapon1: 'Messer', weapon2: 'Pistole', weapon3: 'MP', weapon4: 'Sturmgewehr', weapon5: 'Schrotflinte', weapon6: 'Scharfschützengewehr', weapon7: 'Raketenwerfer',
+  weapon1: 'Messer', weapon2: 'Pistole', weapon3: 'MP', weapon4: 'Sturmgewehr', weapon5: 'Schrotflinte', weapon6: 'Scharfschützengewehr', weapon7: 'Raketenwerfer', weapon8: 'Streitkolben (/mace)', windcharge: 'Windladung (/mace)',
   scoreboard: 'Scoreboard',
 };
 export function keyName(code) {
@@ -581,6 +613,16 @@ async function renderSettings() {
   const slider = (id, label, val) => `<div class="slider-row"><span>${label}</span><input type="range" id="${id}" min="0" max="100" value="${Math.round(val * 100)}"><span id="${id}-v">${Math.round(val * 100)}%</span></div>`;
   view.innerHTML = `
     <div class="settings">
+      <div class="panel" style="grid-column: 1 / -1">
+        <h2>Updates</h2>
+        <div class="row">
+          <label class="row grow" style="font-weight:600"><input type="checkbox" id="s-update-auto" ${s.updates?.auto !== false ? 'checked' : ''}> Automatisch aktualisieren (neue Versionen von GitHub laden)</label>
+          <span class="muted">Version ${esc(state.system.version)}</span>
+          <button class="btn small" id="s-update-check"><span data-icon="refresh"></span>Jetzt suchen</button>
+          <button class="btn small green hidden" id="s-update-now">Jetzt neu starten</button>
+        </div>
+        <div class="muted" id="s-update-status" style="font-size:12px"></div>
+      </div>
       <div class="panel" style="grid-column: 1 / -1">
         <h2>Online spielen (Tailscale)</h2>
         <div class="ts-slot">${tsCardHtml()}</div>
@@ -634,6 +676,10 @@ async function renderSettings() {
   fillIcons(view);
   bindTsCard($('.ts-slot', view));
   refreshTailscale();
+  $('#s-update-auto').onchange = (e) => updateSettings((x) => (x.updates = { auto: e.target.checked }));
+  $('#s-update-check').onclick = async () => { audio.click(); upd = await api.updateCheck(); renderUpdate(); };
+  $('#s-update-now').onclick = () => confirmUpdate();
+  renderUpdate();
 
   $('#s-name').oninput = (e) => updateSettings((x) => (x.playerName = e.target.value.slice(0, 20) || 'Spieler'));
   for (const [id, key] of [['s-master', 'master'], ['s-music', 'music'], ['s-sfx', 'sfx']]) {
@@ -655,7 +701,7 @@ async function renderSettings() {
     updateSettings((x) => (x.controls.keybinds = {
       forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', sprint: 'ControlLeft', reload: 'KeyR',
       weapon1: 'Digit1', weapon2: 'Digit2', weapon3: 'Digit3', weapon4: 'Digit4', weapon5: 'Digit5', weapon6: 'Digit6', weapon7: 'Digit7',
-      scoreboard: 'Tab', fire: 'Mouse0', aim: 'Mouse2', item: 'KeyQ', chat: 'KeyT', sneak: 'ShiftLeft' }));
+      scoreboard: 'Tab', fire: 'Mouse0', aim: 'Mouse2', item: 'KeyQ', chat: 'KeyT', sneak: 'ShiftLeft', weapon8: 'Digit8', windcharge: 'KeyF' }));
     renderSettings();
   };
   for (const cap of $$('[data-bind]', view)) cap.onclick = () => listenForKey(cap);
@@ -721,6 +767,15 @@ async function init() {
     for (const el of $$('.ts-slot')) { el.innerHTML = tsCardHtml(); bindTsCard(el); }
   });
   maybeAskTailscale();
+  upd = await api.updateState();
+  renderUpdate();
+  api.onUpdateState((s) => {
+    const becameReady = s.status === 'ready' && upd.status !== 'ready';
+    upd = s;
+    renderUpdate();
+    if (becameReady) toast(`Update ${s.version} ist bereit – oben auf den grünen Knopf klicken oder einfach später neu starten.`);
+  });
+  $('#update-chip').onclick = () => { if (upd.status === 'ready') confirmUpdate(); };
 }
 
 init().catch((err) => {

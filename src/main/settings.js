@@ -28,6 +28,8 @@ const DEFAULT_KEYBINDS = {
   item: 'KeyQ',
   chat: 'KeyT',
   sneak: 'ShiftLeft',
+  weapon8: 'Digit8',
+  windcharge: 'KeyF',
 };
 
 const DEFAULTS = {
@@ -37,6 +39,7 @@ const DEFAULTS = {
   controls: { sensitivity: 1.0, invertY: false, fov: 80, keybinds: { ...DEFAULT_KEYBINDS } },
   network: { lastAddress: '', gamePort: 27015, partyPort: 27016 },
   tailscale: { prompted: false }, // Erststart-Frage "Tailscale installieren?" schon gezeigt?
+  updates: { auto: true }, // neue Versionen von GitHub automatisch laden
 };
 
 /** Tiefes Zusammenführen: Werte aus `src` überschreiben `base`, unbekannte Typen werden verworfen. */

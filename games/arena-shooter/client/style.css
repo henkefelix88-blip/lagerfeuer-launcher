@@ -56,6 +56,10 @@ canvas { display: block; width: 100vw; height: 100vh; }
 #scope .v { top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; }
 #scope .dot { left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: #e2534a; }
 #crosshair.hidden { display: none; }
+#kit { position: absolute; right: 20px; bottom: 120px; background: rgba(27,34,44,.78); padding: 6px 12px; border-radius: 3px; font-weight: 700; border-left: 3px solid #8fd8ff; }
+#kit b { color: #8fd8ff; font-size: 18px; }
+#kit span { color: #ffd25a; }
+#smash { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); font-size: 30px; font-weight: 900; color: #ffd25a; text-shadow: 0 3px 0 rgba(0,0,0,.45); letter-spacing: .1em; }
 #hp-bar.star { background: linear-gradient(90deg, #ff5a5a, #ffe75a, #6ee07a, #5ab8ff, #b07aff); }
 #hp-max { color: #ffd25a; letter-spacing: 0; }
 .pu { display: grid; grid-template-columns: 30px 120px 34px; align-items: center; gap: 8px; background: var(--panel); padding: 6px 8px; border-radius: 3px; }

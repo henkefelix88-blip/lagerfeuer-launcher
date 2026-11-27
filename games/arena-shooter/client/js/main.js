@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import {
   PROTOCOL_VERSION, WEAPONS, WEAPON_ORDER, BUFF_ORDER, EYE_HEIGHT, WALK_SPEED, SPRINT_SPEED, SNEAK_FACTOR, CROUCH_FACTOR, GRAVITY,
-  JUMP_SPEED, STAMINA, RESPAWN_TIME, MAX_HP, generateWorld, collide, groundHeight, raycastWorld, hitPlayer, spreadDir, dirFromAngles, speedMultiplier,
+  JUMP_SPEED, STAMINA, RESPAWN_TIME, MAX_HP, generateWorld, collide, groundHeight, raycastWorld, hitPlayer, spreadDir, dirFromAngles, speedMultiplier, WIND, SMASH_MIN_FALL, smashBonus,
 } from '../../shared/world.mjs';
 import { buildScene, QUALITY } from './scene.js';
 import { createPlayerModel, setPlayerWeapon, createNameTag, createPickupModel, createProjectileModel, mat } from './models.js';
@@ -22,7 +22,7 @@ const INTERP_DELAY = 0.1; // Sekunden Puffer für die Interpolation fremder Spie
 const DEFAULT_BINDS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', sprint: 'ControlLeft', sneak: 'ShiftLeft', reload: 'KeyR',
   weapon1: 'Digit1', weapon2: 'Digit2', weapon3: 'Digit3', weapon4: 'Digit4', weapon5: 'Digit5', weapon6: 'Digit6', weapon7: 'Digit7',
-  scoreboard: 'Tab', fire: 'Mouse0', aim: 'Mouse2', item: 'KeyQ', chat: 'KeyT',
+  scoreboard: 'Tab', fire: 'Mouse0', aim: 'Mouse2', item: 'KeyQ', chat: 'KeyT', weapon8: 'Digit8', windcharge: 'KeyF',
 };
 
 // ---------- Startparameter (vom Launcher) ----------
@@ -154,6 +154,37 @@ function addExplosion(x, y, z, r, small) {
   const d = Math.hypot(x - me.x, y - me.y, z - me.z);
   me.shake = Math.max(me.shake, Math.max(0, 1 - d / (small ? 8 : 35)));
 }
+/** Windladung platzt: weißer Wirbelring + Luftpartikel + Zischen. */
+function addWindBurst(x, y, z) {
+  const pos = new THREE.Vector3(x, y, z);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.12, 4, 20), new THREE.MeshBasicMaterial({ color: '#dff6ff', transparent: true, opacity: 0.9 }));
+  ring.position.copy(pos); ring.rotation.x = Math.PI / 2;
+  scene.add(ring);
+  booms.push({ mesh: ring, t: 0, r: WIND.radius, wind: true });
+  for (let i = 0; i < 18; i++) {
+    const v = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.9, Math.random() - 0.5).normalize().multiplyScalar(6 + Math.random() * 4);
+    addParticle(pos, i % 2 ? '#ffffff' : '#8fd8ff', v, 0.45, 1.4, 2);
+  }
+  sfx.windBurst(pos);
+  const d = Math.hypot(x - me.x, y - me.y, z - me.z);
+  me.shake = Math.max(me.shake, Math.max(0, 0.5 - d / 20));
+}
+/** Smash: Staubwelle am Boden, dumpfer Schlag, Kamerawackeln. */
+function addSmash(x, y, z, fall, mine) {
+  const pos = new THREE.Vector3(x, y + 0.1, z);
+  const wave = new THREE.Mesh(new THREE.RingGeometry(0.6, 1, 16), new THREE.MeshBasicMaterial({ color: '#c9b48a', transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+  wave.position.copy(pos); wave.rotation.x = -Math.PI / 2;
+  scene.add(wave);
+  booms.push({ mesh: wave, t: 0, r: 3.5, wind: true });
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    addParticle(pos, i % 3 ? '#a08a64' : '#7a6a50', new THREE.Vector3(Math.cos(a) * 7, 2 + Math.random() * 3, Math.sin(a) * 7), 0.6, 2, 8);
+  }
+  sfx.smash(pos, fall);
+  if (mine) hud.message(`SMASH! ${fall.toFixed(1)} m Fall`, 'cheat');
+  const d = Math.hypot(x - me.x, z - me.z);
+  me.shake = Math.max(me.shake, Math.max(0, 1 - d / 15));
+}
 const flashSpriteMat = new THREE.SpriteMaterial({ color: '#ffd25a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
 function thirdPersonFlash(model) {
   if (!model.flash) {
@@ -282,6 +313,7 @@ function onMessage(m) {
       me.maxHp = m.maxHp;
       me.ammo = m.ammo;
       me.cheats = m.cheats;
+      me.kit = !!m.kit;
       if (m.cur !== me.cur && !me.debugCamera) { me.cur = m.cur; viewmodel.setWeapon(m.cur); }
       if (m.reload > 0 && !me.reloading) { viewmodel.startReload(m.reload); sfx.reload(me.cur); }
       if (m.reload <= 0 && me.reloading && viewmodel.reload) viewmodel.cancelReload();
@@ -296,6 +328,7 @@ function onMessage(m) {
       me.itemReady = clock + (m.itemReady || 0);
       hud.setItem(m.item, m.itemReady);
       hud.setCheats(m.cheats);
+      hud.setKit(me.kit);
       viewmodel.setLoaded(!!(m.ammo.rocket && (m.ammo.rocket.mag > 0 || m.cheats.god)));
       hud.setWeapon(me.cur, me.ammo, me.reloading, me.cheats.god);
       break;
@@ -316,8 +349,8 @@ function onMessage(m) {
       const from = new THREE.Vector3(...m.o);
       const p = players.get(m.id);
       if (m.id !== me.id && p) {
-        if (m.w === 'knife') p.slash = 1; else p.kick = 1;
-        if (p.model.weapon && m.w !== 'knife') {
+        if (m.w === 'knife' || m.w === 'mace' || m.w === 'wind') p.slash = 1; else p.kick = 1;
+        if (p.model.weapon && !['knife', 'mace', 'wind'].includes(m.w)) {
           thirdPersonFlash(p.model);
           p.model.weapon.muzzle.getWorldPosition(from);
         }
@@ -366,12 +399,19 @@ function onMessage(m) {
         if (i) Object.assign(i, { kills, deaths, ping });
       }
       break;
+    case 'wind':
+      addWindBurst(m.x, m.y, m.z);
+      break;
+    case 'smash':
+      addSmash(m.x, m.y, m.z, m.fall, m.id === me.id);
+      break;
     case 'boom':
       addExplosion(m.x, m.y, m.z, m.r, m.small);
       break;
     case 'push':
       me.vx += m.v[0]; me.vz += m.v[2];
-      me.vy = Math.max(me.vy, m.v[1]);
+      me.vy = m.reset ? m.v[1] : Math.max(me.vy, m.v[1]);
+      if (m.reset) me.peakY = me.y;
       me.onGround = false;
       break;
     case 'itemUse': {
@@ -502,7 +542,7 @@ $('q-vol').oninput = (e) => { settings.audio.master = e.target.value / 100; $('q
 $('keys-help').innerHTML = [
   ['Bewegen', `${keyName('forward')} ${keyName('left')} ${keyName('back')} ${keyName('right')}`], ['Boost', keyName('sprint')], ['Springen', keyName('jump')], ['Schleichen', keyName('sneak')],
   ['Schießen', keyName('fire')], ['Zielen / Zoom', keyName('aim')], ['Nachladen', keyName('reload')],
-  ['Waffen', `1–7 · Mausrad`], ['Item einsetzen', keyName('item')], ['Chat', keyName('chat')],
+  ['Waffen', `1–7 · Mausrad`], ['Item einsetzen', keyName('item')], ['Chat', keyName('chat')], ['Windladung (/mace)', keyName('windcharge')],
   ['Scoreboard', keyName('scoreboard')], ['Menü', 'Esc'],
 ].map(([a, b]) => `<span>${a}</span><b>${b}</b>`).join('');
 
@@ -606,7 +646,7 @@ function updateMe(dt) {
   const wl = Math.hypot(wx, wz);
   if (wl > 0) { wx /= wl; wz /= wl; }
 
-  me.ads = ((active && isDown('aim')) || me.debugAds) && me.cur !== 'knife' && !me.reloading;
+  me.ads = ((active && isDown('aim')) || me.debugAds) && !WEAPONS[me.cur].melee && !me.reloading;
 
   // Boost (Strg gedrückt halten) mit Ausdauer
   // Schleichen (Shift): langsam, leise, geduckt – beim Fliegen-Cheat heißt Shift "runter"
@@ -645,6 +685,8 @@ function updateMe(dt) {
   if (me.y <= g) { me.y = g; me.vy = Math.max(0, me.vy); me.onGround = true; } else if (me.y > g + 0.05) me.onGround = false;
   if (me.onGround && !fly && g > 0 && me.y - g < 0.6 && me.vy <= 0) me.y = g; // Treppen glatt hochlaufen
   const moved = Math.hypot(me.x - ox, me.z - oz);
+  // Fallhöhe für den Streitkolben-Smash (höchster Punkt seit dem letzten Bodenkontakt)
+  if (me.onGround) me.peakY = me.y; else me.peakY = Math.max(me.peakY ?? me.y, me.y);
   if (me.onGround) {
     me.stepDist += moved;
     if (me.stepDist > (me.sprinting ? 2.8 : 2.2)) { me.stepDist = 0; if (!me.sneaking) sfx.step(null, me.sprinting); }
@@ -656,6 +698,11 @@ function updateMe(dt) {
       if (a && !WEAPONS[me.cur].melee && a.mag < WEAPONS[me.cur].mag && a.reserve > 0 && !me.reloading && !me.cheats.god) net.send({ t: 'reload' });
     }
     WEAPON_ORDER.forEach((w, i) => { if (wasPressed(`weapon${i + 1}`)) switchWeapon(w); });
+    if (wasPressed('windcharge') && me.kit && !stunned && clock - (me.windAt ?? -10) >= WIND.cooldown) {
+      me.windAt = clock;
+      net.send({ t: 'wind', d: dirFromAngles(me.yaw, me.pitch).map((v) => Math.round(v * 1000) / 1000) });
+      sfx.windThrow();
+    }
     if (wasPressed('item') && me.item && clock >= me.itemReady && !stunned) {
       net.send({ t: 'item', d: dirFromAngles(me.yaw, me.pitch).map((v) => Math.round(v * 1000) / 1000) });
     }
@@ -772,7 +819,7 @@ function updateEffects(dt) {
     const k = b.t / 0.4;
     b.mesh.scale.setScalar(b.r * Math.min(1, k * 1.4));
     b.mesh.material.opacity = Math.max(0, 0.9 * (1 - k));
-    b.mesh.material.color.setHSL(0.08 - k * 0.06, 1, 0.6 - k * 0.3);
+    if (!b.wind) b.mesh.material.color.setHSL(0.08 - k * 0.06, 1, 0.6 - k * 0.3);
     if (k >= 1) { scene.remove(b.mesh); booms.splice(i, 1); }
   }
   boomLight.intensity = Math.max(0, boomLight.intensity - dt * 500);
@@ -780,7 +827,11 @@ function updateEffects(dt) {
   for (const p of projectiles.values()) {
     const age = Math.min(0.2, now - p.t0);
     const tx = p.x + p.vx * age, ty = p.y + p.vy * age, tz = p.z + p.vz * age;
-    if (p.kind === 'rocket') {
+    if (p.kind === 'wind') {
+      p.mesh.position.set(tx, ty, tz);
+      p.mesh.rotation.y += dt * 9; p.mesh.rotation.x += dt * 5;
+      if (Math.random() < dt * 30) addParticle(p.mesh.position, '#dff6ff', new THREE.Vector3((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5)), 0.35, 1.2, 0);
+    } else if (p.kind === 'rocket') {
       p.mesh.position.set(tx, ty, tz);
       p.mesh.lookAt(tx - p.vx, ty - p.vy, tz - p.vz);
       p.smokeT -= dt;
@@ -856,7 +907,8 @@ function frame(now) {
     updateEffects(dt);
     updateCamera(dt);
     sceneCtl.update(dt, me);
-    viewmodel.update(dt, { speed: Math.hypot(me.vx, me.vz), sprinting: me.sprinting, onGround: me.onGround || me.cheats.god, ads: me.ads });
+    viewmodel.update(dt, { speed: Math.hypot(me.vx, me.vz), sprinting: me.sprinting, onGround: me.onGround || me.cheats.god, ads: me.ads, smashReady: me.cur === 'mace' && !me.onGround && me.vy < 0 && (me.peakY ?? me.y) - me.y >= SMASH_MIN_FALL });
+    hud.setSmash(me.cur === 'mace' && !me.onGround && me.vy < 0 ? smashBonus((me.peakY ?? me.y) - me.y) : 0);
     hud.setHealth(me.hp, me.maxHp, has('shield'), has('star'));
     hud.setSpawnProtection(me.protectedFlag && me.alive);
     hud.setScope(viewmodel.scoped && me.alive);
@@ -903,6 +955,12 @@ window.__gameCamera = (x, y, z, yaw, pitch, weapon) => {
   Object.assign(me, { x, y, z, yaw, pitch, alive: true, debugCamera: true, vx: 0, vy: 0, vz: 0 });
   if (weapon) { me.ammo[weapon] ??= { mag: 5, reserve: 5 }; me.cur = weapon; viewmodel.setWeapon(weapon); }
   return world ? world.buildings.map((b) => [b.type, Math.round(b.x), Math.round(b.z)]) : null;
+};
+window.__gameFx = (kind) => {
+  const d = dirFromAngles(me.yaw, 0);
+  if (kind === 'wind') addWindBurst(me.x + d[0] * 5, me.y + 1, me.z + d[2] * 5);
+  if (kind === 'smash') addSmash(me.x + d[0] * 4, me.y, me.z + d[2] * 4, 6, false);
+  return true;
 };
 window.__gameViewmodel = (action, arg) => {
   if (action === 'reload') viewmodel.startReload(arg || 2);

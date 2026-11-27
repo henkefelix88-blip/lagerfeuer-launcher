@@ -105,6 +105,13 @@ export class Sfx {
       this.tone(o, 70, 0.5, 'sawtooth', 0.6, 30);
       this.noiseBurst(o, 0.08, 2500, 5, 'bandpass', 0.001, 0.55); // Repetieren
       this.noiseBurst(o, 0.08, 1800, 5, 'bandpass', 0.001, 0.75);
+    } else if (weapon === 'mace') {
+      this.noiseBurst(o, 0.3, 1800, 1.5, 'bandpass', 0.08);
+      this.tone(o, 140, 0.25, 'triangle', 0.3, 70);
+      return;
+    } else if (weapon === 'wind') {
+      this.windThrow(pos);
+      return;
     } else if (weapon === 'knife') {
       this.noiseBurst(o, 0.18, 6000, 2, 'bandpass', 0.06);
       return;
@@ -132,6 +139,9 @@ export class Sfx {
     this.noiseBurst(o, small ? 0.4 : 1.4, small ? 2500 : 1800, 0.5, 'lowpass', 0.003);
     this.tone(o, small ? 120 : 70, small ? 0.3 : 1.0, 'sine', 0.9, 25);
   }
+  windThrow(pos = null) { const o = this.out(pos, 0.5); this.noiseBurst(o, 0.35, 2500, 1.2, 'bandpass', 0.05); this.tone(o, 500, 0.3, 'sine', 0.15, 900); }
+  windBurst(pos) { const o = this.out(pos, 1.4); this.noiseBurst(o, 0.7, 3500, 0.6, 'highpass', 0.005); this.noiseBurst(o, 0.5, 900, 0.8, 'lowpass', 0.01); this.tone(o, 900, 0.35, 'sine', 0.2, 250); }
+  smash(pos, fall = 3) { const o = this.out(pos, 2); this.tone(o, 90, 0.7, 'sine', 0.9, 30); this.noiseBurst(o, 0.6, 700, 0.6, 'lowpass', 0.002); this.tone(o, 220 + fall * 20, 0.25, 'square', 0.2, 60); }
   knifeHit() { this.noiseBurst(this.out(null, 0.5), 0.1, 1500, 2, 'bandpass'); this.tone(this.out(null, 0.3), 300, 0.08, 'triangle', 0.4, 120); }
   roulette() { this.tone(this.out(null, 0.25), 900 + Math.random() * 600, 0.04, 'square', 0.15); }
   itemGot() { const o = this.out(null, 0.4); [784, 988, 1175].forEach((f, i) => this.tone(o, f, 0.12, 'triangle', 0.35, null, i * 0.05)); }

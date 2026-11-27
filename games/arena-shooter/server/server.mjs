@@ -14,7 +14,7 @@ import crypto from 'node:crypto';
 import {
   PROTOCOL_VERSION, TICK_RATE, MAX_HP, WALK_SPEED, SPRINT_SPEED, RESPAWN_TIME, SPAWN_PROTECTION,
   WEAPONS, WEAPON_ORDER, BUFFS, BUFF_ORDER, ITEMS, ITEM_ORDER, SHELL, ROCKET, CHEATS, ITEMBOX_RESPAWN, WEAPON_RESPAWN,
-  EYE_HEIGHT, CROUCH_FACTOR, generateWorld, collide, groundHeight, raycastWorld, hitPlayer, spreadDir, dirFromAngles, playerColor, speedMultiplier,
+  EYE_HEIGHT, CROUCH_FACTOR, WIND, smashBonus, generateWorld, collide, groundHeight, raycastWorld, hitPlayer, spreadDir, dirFromAngles, playerColor, speedMultiplier,
 } from '../shared/world.mjs';
 
 const MAX_PLAYERS = 16;
@@ -201,6 +201,7 @@ class GameState {
         }
         return;
       case 'item': return this.useItem(p, msg.d);
+      case 'wind': return this.throwWind(p, msg.d);
       case 'chat': return this.onChat(p, msg.text);
       case 'ping':
         this.send(p, { t: 'pong', c: msg.c });
@@ -214,6 +215,7 @@ class GameState {
     const text = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
     if (!text || this.time - p.chatAt < 0.4) return;
     p.chatAt = this.time;
+    if (text.startsWith('/')) return this.onCommand(p, text);
     const cheat = CHEATS[text];
     if (cheat) {
       const on = !p.cheats[cheat.id];
@@ -251,6 +253,9 @@ class GameState {
     p.sprinting = !!m.sp;
     p.ads = !!m.ads;
     p.crouch = !!m.cr;
+    // Fallhöhe für den Streitkolben-Smash: höchster Punkt seit der letzten Bodenberührung
+    if (p.y <= groundHeight(this.world, p.x, p.z, p.y) + 0.05) p.peakY = p.y;
+    else p.peakY = Math.max(p.peakY ?? p.y, p.y);
   }
 
   startReload(p) {
@@ -340,15 +345,83 @@ class GameState {
       for (const q of this.players.values()) {
         if (q === p || !q.alive) continue;
         const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz);
-        if (d < w.range && Math.abs(q.y - p.y) < 1.5 && (dx * dir[0] + dz * dir[2]) / (d || 1) > 0.7) { target = q; break; }
+        if (d < w.range && Math.abs(q.y - p.y) < (w.smash ? 3 : 1.5) && (dx * dir[0] + dz * dir[2]) / (d || 1) > 0.7) { target = q; break; }
       }
     }
     if (target && raycastWorld(this.world, origin, dir, best) < best - 0.2) target = null; // Wand dazwischen
-    this.broadcast({ t: 'shot', id: p.id, w: 'knife', o: origin.map((v) => round(v)), e: [] });
+    this.broadcast({ t: 'shot', id: p.id, w: w.id, o: origin.map((v) => round(v)), e: [] });
     if (!target) return;
+    if (w.smash) return this.maceHit(p, target, w, damageMul, head);
     // Von hinten erstechen = mehr Schaden
     const back = Math.cos(target.yaw - p.yaw) > 0.5;
     this.damage(target, w.damage * damageMul * (head ? w.headMul : 1) * (back ? 2 : 1), p, 'knife', head);
+  }
+
+  /** Streitkolben: Schaden wächst mit der Fallhöhe. Ein Smash schleudert Umstehende weg und federt dich ab. */
+  maceHit(p, target, w, damageMul, head) {
+    const fall = Math.max(0, (p.peakY ?? p.y) - p.y);
+    const bonus = smashBonus(fall);
+    if (bonus > 0) {
+      this.broadcast({ t: 'smash', id: p.id, x: round(target.x), y: round(target.y), z: round(target.z), fall: round(fall, 10) });
+      for (const q of this.players.values()) { // Schockwelle
+        if (q === p || !q.alive) continue;
+        const dx = q.x - target.x, dz = q.z - target.z, d = Math.hypot(dx, dz);
+        if (d > 3.5) continue;
+        if (q !== target) this.damage(q, 6, p, 'mace');
+        q.graceUntil = this.time + 1.5;
+        const n = d > 0.01 ? [dx / d, dz / d] : [0, 0];
+        this.send(q, { t: 'push', v: [round(n[0] * 7), 6, round(n[1] * 7)] });
+      }
+      p.peakY = p.y;
+      p.graceUntil = this.time + 1.5;
+      this.send(p, { t: 'push', v: [0, 7, 0], reset: true }); // Rückprall wie nach einer Landung auf dem Gegner
+    }
+    this.damage(target, (w.damage + bonus) * damageMul * (head ? w.headMul : 1), p, 'mace', head);
+  }
+
+  /** Chat-Befehle (beginnen mit "/"). Werden nie an die anderen gesendet. */
+  onCommand(p, text) {
+    const cmd = text.split(' ')[0].toLowerCase();
+    if (cmd === '/mace') {
+      p.maceKit = !p.maceKit;
+      if (p.maceKit) { p.weapons.mace = { mag: 0, reserve: 0 }; p.current = 'mace'; p.reloadUntil = 0; }
+      else { delete p.weapons.mace; if (p.current === 'mace') p.current = 'pistol'; }
+      this.send(p, { t: 'cheat', text: p.maceKit ? 'Streitkolben + unendlich Windladungen erhalten (Taste F = Windladung)' : 'Streitkolben abgelegt' });
+      this.sendPrivate(p);
+    } else {
+      this.send(p, { t: 'cheat', text: `Unbekannter Befehl ${cmd} – verfügbar: /mace` });
+    }
+  }
+
+  /** Windladung werfen (nur mit /mace, dafür unendlich). */
+  throwWind(p, d) {
+    if (!p.alive || !p.maceKit || this.has(p, 'stun') || this.time - (p.windAt ?? -10) < WIND.cooldown) return;
+    if (!Array.isArray(d) || d.length !== 3 || !d.every(Number.isFinite)) return;
+    const l = Math.hypot(...d) || 1;
+    const dir = [d[0] / l, d[1] / l, d[2] / l];
+    p.windAt = this.time;
+    const eye = p.y + EYE_HEIGHT * (p.crouch ? CROUCH_FACTOR : 1);
+    this.projectiles.push({ id: this.nextObjId++, kind: 'wind', owner: p.id, x: p.x + dir[0] * 0.5, y: eye + dir[1] * 0.5 - 0.1, z: p.z + dir[2] * 0.5, vx: dir[0] * WIND.speed, vy: dir[1] * WIND.speed, vz: dir[2] * WIND.speed, life: WIND.life, born: this.time });
+    this.broadcast({ t: 'shot', id: p.id, w: 'wind', o: [round(p.x), round(eye), round(p.z)], e: [] });
+  }
+
+  /** Windladung platzt: Rückstoß weg vom Zentrum + nach oben, kaum Schaden. Wirkt auch auf den Werfer (Wind-Sprung). */
+  windBurst(x, y, z, owner) {
+    this.broadcast({ t: 'wind', x: round(x), y: round(y), z: round(z) });
+    const attacker = this.players.get(owner) || { id: owner, x, z, kills: 0 };
+    for (const q of this.players.values()) {
+      if (!q.alive) continue;
+      const cx = q.x, cy = q.y + 0.9, cz = q.z;
+      const dx = cx - x, dy = cy - y, dz = cz - z, d = Math.hypot(dx, dy, dz);
+      if (d > WIND.radius) continue;
+      const k = 1 - d / WIND.radius * 0.6; // auch am Rand noch spürbar
+      const h = Math.hypot(dx, dz);
+      const nx = h > 0.05 ? dx / h : 0, nz = h > 0.05 ? dz / h : 0;
+      q.graceUntil = this.time + 2;
+      q.peakY = q.y; // Fallhöhe zählt ab dem höchsten Punkt des neuen Flugs
+      if (q.id !== owner) this.damage(q, WIND.damage, attacker, 'wind');
+      this.send(q, { t: 'push', v: [round(nx * WIND.push * k), round(WIND.up * k), round(nz * WIND.push * k)], reset: true });
+    }
   }
 
   damage(target, amount, attacker, weaponId, head = false) {
@@ -460,7 +533,7 @@ class GameState {
       const pr = this.projectiles[i];
       pr.life -= dt;
       let remove = pr.life <= 0;
-      if (pr.kind === 'rocket') {
+      if (pr.kind === 'rocket' || pr.kind === 'wind') {
         const speed = Math.hypot(pr.vx, pr.vy, pr.vz);
         const d = [pr.vx / speed, pr.vy / speed, pr.vz / speed];
         const stepLen = speed * dt;
@@ -473,7 +546,8 @@ class GameState {
         }
         if (t < stepLen || remove || Math.abs(pr.x) > 260 || Math.abs(pr.z) > 260) {
           const k = Math.min(t, stepLen) - 0.1;
-          this.explode(pr.x + d[0] * k, pr.y + d[1] * k, pr.z + d[2] * k, pr.owner, pr.dmg);
+          if (pr.kind === 'wind') this.windBurst(pr.x + d[0] * k, pr.y + d[1] * k, pr.z + d[2] * k, pr.owner);
+          else this.explode(pr.x + d[0] * k, pr.y + d[1] * k, pr.z + d[2] * k, pr.owner, pr.dmg);
           remove = true;
         } else {
           pr.x += pr.vx * dt; pr.y += pr.vy * dt; pr.z += pr.vz * dt;
@@ -558,6 +632,8 @@ class GameState {
     p.alive = true;
     p.protectedUntil = this.time + SPAWN_PROTECTION;
     p.weapons = { knife: { mag: 0, reserve: 0 }, pistol: { mag: WEAPONS.pistol.mag, reserve: WEAPONS.pistol.reserve } };
+    if (p.maceKit) p.weapons.mace = { mag: 0, reserve: 0 }; // /mace bleibt über den Tod hinaus
+    p.peakY = 0;
     p.current = 'pistol';
     p.reloadUntil = 0;
     p.buffs = {};
@@ -757,7 +833,7 @@ class GameState {
       t: 'you', hp: Math.ceil(p.hp), maxHp: p.maxHp, cur: p.current, ammo: p.weapons, buffs,
       item: p.item, itemReady: p.item ? Math.max(0, round(p.itemReadyAt - this.time, 100)) : 0,
       reload: p.reloadUntil > this.time ? round(p.reloadUntil - this.time, 100) : 0,
-      cheats: p.cheats,
+      cheats: p.cheats, kit: !!p.maceKit,
     });
   }
 

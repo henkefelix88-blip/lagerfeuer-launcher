@@ -17,7 +17,7 @@ const VM_SCALE = 0.62;
 const HOME = {
   knife: new THREE.Vector3(0.17, -0.16, -0.42), pistol: new THREE.Vector3(0.15, -0.15, -0.5), smg: new THREE.Vector3(0.16, -0.16, -0.52),
   rifle: new THREE.Vector3(0.16, -0.16, -0.6), shotgun: new THREE.Vector3(0.16, -0.16, -0.6), sniper: new THREE.Vector3(0.17, -0.17, -0.62),
-  rocket: new THREE.Vector3(0.22, -0.17, -0.72),
+  rocket: new THREE.Vector3(0.22, -0.17, -0.72), mace: new THREE.Vector3(0.2, -0.2, -0.46),
 };
 const RELOAD_KIND = { pistol: 'mag', smg: 'mag', rifle: 'mag', sniper: 'mag', shotgun: 'shells', rocket: 'rocket' };
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -42,12 +42,12 @@ export class ViewModel {
       w.group.scale.setScalar(VM_SCALE);
       const handR = createHand(1);
       handR.position.copy(w.gripR);
-      handR.rotation.x = id === 'knife' ? 0 : -0.25;
+      handR.rotation.x = id === 'knife' || id === 'mace' ? 0 : -0.25;
       w.group.add(handR);
       const handL = createHand(-1);
       handL.position.copy(w.gripL);
       handL.rotation.set(-0.2, 0.3, 0.6);
-      if (id === 'knife') { handL.position.set(-0.25, -0.25, 0.1); handL.visible = false; }
+      if (id === 'knife' || id === 'mace') { handL.position.set(-0.25, -0.25, 0.1); handL.visible = false; }
       (w.pump || w.group).add(handL);
       if (w.pump) handL.position.sub(w.pump.position);
       const handLHome = handL.position.clone();
@@ -79,6 +79,7 @@ export class ViewModel {
     this.sprintBlend = 0;
     this.adsBlend = 0;
     this.slash = null;
+    this.slam = null;
     this.bob = 0;
     this.sway = new THREE.Vector2();
   }
@@ -124,6 +125,7 @@ export class ViewModel {
   shoot() {
     const id = this.current;
     this.shotT = 0;
+    if (id === 'mace') { this.slam = { t: 0 }; return; }
     if (id === 'knife') {
       this.rig.slashDir *= -1;
       this.slash = { t: 0, dir: this.rig.slashDir };
@@ -186,7 +188,7 @@ export class ViewModel {
     const home = HOME[id];
 
     // Zielen
-    const canAds = s.ads && id !== 'knife' && !this.reload;
+    const canAds = s.ads && id !== 'knife' && id !== 'mace' && !this.reload;
     this.adsBlend += ((canAds ? 1 : 0) - this.adsBlend) * Math.min(1, dt * 12);
     const ads = this.adsBlend;
     // Visierpunkt in die Bildmitte
@@ -245,6 +247,20 @@ export class ViewModel {
         rz += sweep * 0.9 * e; ry += 0.5 * e * d; rx += 0.3 * e;
       }
     }
+
+    // --- Streitkolben-Schlag: weit ausholen, dann kraftvoll nach unten schlagen ---
+    if (this.slam) {
+      this.slam.t += dt;
+      const k = this.slam.t / 0.45;
+      if (k >= 1) this.slam = null;
+      else {
+        const up = k < 0.35 ? ease(k / 0.35) : 1 - ease(Math.min(1, (k - 0.35) / 0.25));
+        const down = k < 0.35 ? 0 : k < 0.6 ? ease((k - 0.35) / 0.25) : 1 - ease((k - 0.6) / 0.4);
+        rx += up * 1.3 - down * 1.1; py += up * 0.12 - down * 0.08; pz += up * 0.08 - down * 0.15; px -= down * 0.06; rz += up * 0.3;
+      }
+    }
+    // Im freien Fall mit dem Streitkolben: Waffe zum Schlag erhoben (zeigt "Smash bereit")
+    if (id === 'mace' && s.smashReady && !this.slam) { rx += 0.7; py += 0.05; }
 
     // --- Nachladen ---
     if (this.reload) {

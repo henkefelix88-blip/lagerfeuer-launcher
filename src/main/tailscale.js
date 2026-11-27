@@ -23,8 +23,10 @@ function findExe() {
   return candidates.find((p) => fs.existsSync(p)) || null;
 }
 
+// PSModulePath entfernen: sonst lädt Windows PowerShell 5.1 evtl. inkompatible Module einer PowerShell-7-Installation.
+const cleanEnv = () => { const e = { ...process.env }; delete e.PSModulePath; return e; };
 const run = (file, args, timeout = 8000) => new Promise((resolve) => {
-  execFile(file, args, { timeout, windowsHide: true }, (err, stdout, stderr) => resolve({ err, stdout: String(stdout || ''), stderr: String(stderr || '') }));
+  execFile(file, args, { timeout, windowsHide: true, env: cleanEnv() }, (err, stdout, stderr) => resolve({ err, stdout: String(stdout || ''), stderr: String(stderr || '') }));
 });
 
 /** Wertet die Ausgabe von `tailscale status --json` aus (separat, damit testbar). */

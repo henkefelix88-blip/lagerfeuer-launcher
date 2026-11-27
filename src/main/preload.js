@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld('launcher', {
   screenResolutions: () => ipcRenderer.invoke('system:resolutions'),
   openGamesFolder: () => ipcRenderer.invoke('games:openFolder'),
 
+  // Auto-Update
+  updateState: () => ipcRenderer.invoke('update:get'),
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
+  onUpdateState: (cb) => ipcRenderer.on('update:state', (_e, s) => cb(s)),
+
   // Tailscale
   tailscaleStatus: () => ipcRenderer.invoke('tailscale:status'),
   tailscaleInstall: () => ipcRenderer.invoke('tailscale:install'),

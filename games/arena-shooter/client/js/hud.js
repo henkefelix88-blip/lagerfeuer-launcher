@@ -233,6 +233,17 @@ export class Hud {
   }
 
   setSpawnProtection(on) { $('spawn-protect').classList.toggle('hidden', !on); }
+  /** /mace aktiv: Anzeige "Windladungen ∞ [F]". */
+  setKit(on) {
+    $('kit').classList.toggle('hidden', !on);
+    $('kit').innerHTML = `<b>∞</b> Windladungen <span>[${this.keyName('windcharge')}]</span>`;
+  }
+  /** Im Fallen mit dem Streitkolben: möglicher Smash-Zusatzschaden. */
+  setSmash(bonus) {
+    const el = $('smash');
+    el.classList.toggle('hidden', bonus <= 0);
+    if (bonus > 0) el.textContent = `SMASH +${bonus}`;
+  }
   setCheats(cheats) {
     const list = [cheats.god && 'GOD', cheats.trigger && 'TRIGGER', cheats.life && '10× LEBEN'].filter(Boolean);
     $('cheat-badge').textContent = list.join(' · ');

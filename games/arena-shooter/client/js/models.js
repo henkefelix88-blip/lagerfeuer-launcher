@@ -144,6 +144,26 @@ export function createWeapon(id) {
     g.add(box(0.008, 0.008, 0.18, PALETTE.dark, 0.02, -0.05, -0.38)); g.add(box(0.008, 0.008, 0.18, PALETTE.dark, -0.02, -0.05, -0.38));
     muzzle.position.set(0, 0.015, -0.95);
     sight.set(0, 0.1, 0.16); gripR.set(0, -0.11, 0.16); gripL.set(0, -0.05, -0.32); eject.set(0.04, 0.03, 0.06);
+  } else if (id === 'mace') {
+    // Streitkolben: umwickelter Griff, schwerer Kopf mit Stacheln, Knauf
+    g.add(cyl(0.022, 0.026, 0.42, 8, PALETTE.woodDark, 0, 0, -0.02, true));          // Stiel
+    for (let i = 0; i < 4; i++) g.add(cyl(0.028, 0.028, 0.025, 8, PALETTE.dark, 0, 0, 0.08 + i * 0.035, true)); // Wicklung
+    g.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.035, 0), mat(PALETTE.steel, SHINY)).translateZ(0.2)); // Knauf
+    g.add(cyl(0.04, 0.03, 0.05, 8, PALETTE.metal, 0, 0, -0.24, true, SHINY));           // Hals
+    const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.075, 0), mat('#7d8794', SHINY));
+    head.position.z = -0.32;
+    g.add(head);
+    g.add(cyl(0.082, 0.082, 0.04, 8, PALETTE.fire, 0, 0, -0.32, true));                  // Ring (Akzentfarbe)
+    for (const [x, y, z] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, -1], [0.7, 0.7, 0], [-0.7, 0.7, 0], [0.7, -0.7, 0], [-0.7, -0.7, 0]]) {
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.07, 5), mat(PALETTE.steel, SHINY));
+      spike.position.set(x * 0.085, y * 0.085, -0.32 + z * 0.085);
+      spike.lookAt(new THREE.Vector3(x * 2, y * 2, -0.32 + z * 2));
+      spike.rotateX(Math.PI / 2);
+      g.add(spike);
+    }
+    gripR.set(0, -0.01, 0.12); gripL.set(0, -0.06, 0.3);
+    sight.set(0, 0.05, 0);
+    muzzle.position.set(0, 0, -0.32);
   } else if (id === 'rocket') {
     g.add(cyl(0.065, 0.065, 0.95, 10, PALETTE.olive, 0, 0.02, -0.12, true));  // Rohr
     g.add(cyl(0.085, 0.07, 0.12, 10, PALETTE.dark, 0, 0.02, -0.62, true));    // Mündungstrichter
@@ -351,6 +371,16 @@ export function createProjectileModel(kind) {
       const a = (i / 6) * Math.PI * 2;
       g.add(new THREE.Mesh(new THREE.CircleGeometry(0.08, 6), mat('#f4f1e6')).translateX(Math.cos(a) * 0.2).translateZ(Math.sin(a) * 0.2).translateY(0.2).rotateX(-1.0));
     }
+  } else if (kind === 'wind') {
+    // Windladung: hellblauer Kern mit zwei rotierenden Wirbelringen
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0), new THREE.MeshLambertMaterial({ color: '#dff6ff', emissive: '#8fd8ff', emissiveIntensity: 0.6, flatShading: true, transparent: true, opacity: 0.85 }));
+    g.add(core);
+    for (let i = 0; i < 2; i++) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.32 - i * 0.08, 0.035, 4, 12), new THREE.MeshBasicMaterial({ color: i ? '#ffffff' : '#8fd8ff', transparent: true, opacity: 0.8 }));
+      ring.rotation.set(i ? 1.2 : 0.3, i ? 0.4 : 1.1, 0);
+      g.add(ring);
+    }
+    g.userData.spin = true;
   } else if (kind === 'banana') {
     for (let i = 0; i < 3; i++) {
       const seg = box(0.12, 0.08, 0.22, '#f6d743', 0, 0.05, 0);

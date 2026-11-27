@@ -50,6 +50,12 @@ button, input, select { font: inherit; color: inherit; }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--text); border-bottom-color: var(--fire); --icon-2: var(--fire); }
 .badge { background: var(--grass); color: #10220b; border-radius: 10px; padding: 0 7px; font-size: 11px; font-weight: 800; }
+.update-chip { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 0; border-radius: var(--radius); background: var(--panel); color: var(--text); font-weight: 700; cursor: pointer; }
+.update-chip.ready { background: var(--grass); color: #10220b; animation: pulse 1.6s ease-in-out infinite; }
+.update-chip .bar { width: 70px; height: 5px; background: rgba(255,255,255,.15); }
+.update-chip .bar i { display: block; height: 100%; background: var(--flame); }
+@keyframes pulse { 50% { filter: brightness(1.2); } }
+.update-chip:not(.hidden) + .player-chip { margin-left: 0; }
 .player-chip { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--panel); border-radius: var(--radius); --icon-2: var(--grass); }
 
 main { position: relative; z-index: 1; height: calc(100% - 64px); }

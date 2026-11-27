@@ -182,6 +182,41 @@ test('Chat: normale Nachricht für alle, Cheat-Codes geheim', async () => {
   }
 });
 
+test('/mace: Streitkolben + Windladung, Smash-Schaden steigt mit der Fallhöhe', async () => {
+  const srv = await createServer({ port: 0, host: '127.0.0.1', WebSocketServer, log: quiet });
+  try {
+    const { a, b, pa, pb } = await duel(srv);
+    a.send({ t: 'chat', text: '/mace' });
+    const you = await a.wait((m) => m.t === 'you' && m.kit && m.ammo.mace);
+    assert.equal(you.cur, 'mace');
+    await new Promise((r) => setTimeout(r, 100));
+    assert.ok(!b.msgs.some((m) => m.t === 'chat'), 'Befehl darf nicht im Chat erscheinen');
+    // Windladung vor die eigenen Füße → schleudert einen selbst nach oben
+    a.send({ t: 'wind', d: [0, -1, 0] });
+    const push = await a.wait((m) => m.t === 'push', 2000);
+    assert.ok(push.v[1] > 5, `kein Rückstoß nach oben (${push.v})`);
+    await a.wait((m) => m.t === 'wind');
+    // Ohne Fall: normaler Treffer; aus 6 m Fallhöhe: Smash
+    const hitAt = (fall) => {
+      Object.assign(pb, { x: pa.x, z: pa.z - 1.8, y: 0, hp: 1000, maxHp: 1000, protectedUntil: 0 });
+      Object.assign(pa, { y: 0, peakY: fall, lastShot: -10 });
+      const before = pb.hp;
+      srv.game.onShoot(pa, { t: 'shoot', d: [0, -0.2, -1] });
+      return before - pb.hp;
+    };
+    const normal = hitAt(0);
+    const smash = hitAt(6);
+    assert.ok(normal > 0 && smash > normal * 3, `Smash ${smash} vs normal ${normal}`);
+    // nochmal /mace → wieder weg
+    pa.chatAt = -10;
+    a.send({ t: 'chat', text: '/mace' });
+    await a.wait((m) => m.t === 'you' && !m.kit, 2000);
+    a.ws.close(); b.ws.close();
+  } finally {
+    await srv.stop();
+  }
+});
+
 test('Messer und Raketenwerfer (Flächenschaden + Rückstoß)', async () => {
   const srv = await createServer({ port: 0, host: '127.0.0.1', WebSocketServer, log: quiet });
   try {

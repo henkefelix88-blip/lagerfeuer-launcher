@@ -21,6 +21,7 @@ const { GameRegistry } = require('./gameRegistry');
 const { GameServerManager } = require('./gameServerManager');
 const { PartyServer } = require('./party/partyServer');
 const tailscale = require('./tailscale');
+const updater = require('./updater');
 
 const SELFTEST = process.argv.includes('--selftest');
 const LAUNCHER_DIR = path.join(__dirname, '..', 'launcher');
@@ -212,6 +213,47 @@ function listResolutions() {
   return [...set].sort((a, b) => Number(a.split('x')[0]) - Number(b.split('x')[0]) || Number(a.split('x')[1]) - Number(b.split('x')[1]));
 }
 
+// ---------- Auto-Update ----------
+// status: idle | checking | uptodate | downloading | ready | error | dev
+const update = { status: 'idle', version: null, current: app.getVersion(), progress: 0, error: null, prep: null };
+const updateView = () => ({ status: update.status, version: update.version, current: update.current, progress: update.progress, error: update.error, auto: settings?.get().updates.auto });
+function sendUpdate() { if (launcherWin) launcherWin.webContents.send('update:state', updateView()); }
+const installDir = () => path.dirname(app.getPath('exe'));
+
+async function runUpdateCheck(manual = false) {
+  if (['checking', 'downloading', 'ready'].includes(update.status)) return updateView();
+  if (!app.isPackaged && !process.env.LAGERFEUER_UPDATE_URL) { update.status = 'dev'; sendUpdate(); return updateView(); }
+  update.status = 'checking'; update.error = null; sendUpdate();
+  try {
+    const r = await updater.check(update.current);
+    update.version = r.version;
+    if (!r.available) { update.status = 'uptodate'; sendUpdate(); return updateView(); }
+    if (!updater.canWrite(installDir())) throw new Error('Der Programmordner ist schreibgeschützt – bitte die neue Version von GitHub laden und in einen anderen Ordner entpacken.');
+    log(`[Update] Neue Version ${r.version} gefunden (aktuell ${update.current}) – lade herunter …`);
+    update.status = 'downloading'; update.progress = 0; sendUpdate();
+    let lastSent = 0;
+    const dl = await updater.download(r.asset, (p) => { update.progress = p; if (Date.now() - lastSent > 300) { lastSent = Date.now(); sendUpdate(); } });
+    log(`[Update] Download fertig, Prüfsumme ${dl.verified ? 'bestätigt' : 'nicht von GitHub angegeben'} (${dl.sha256.slice(0, 12)}…)`);
+    update.prep = await updater.prepare(dl);
+    update.status = 'ready'; update.progress = 1; sendUpdate();
+    log(`[Update] Version ${r.version} ist bereit zum Einspielen.`);
+  } catch (err) {
+    update.status = 'error'; update.error = err.message; sendUpdate();
+    log(`[Update] Fehler: ${err.message}`);
+    if (!manual) update.status = 'idle';
+  }
+  return updateView();
+}
+
+/** Update einspielen. relaunch = Launcher danach neu starten. */
+function installUpdate(relaunch) {
+  if (update.status !== 'ready' || !update.prep) return false;
+  const r = updater.apply(update.prep, { installDir: installDir(), exePath: app.getPath('exe'), pid: process.pid, relaunch });
+  log(`[Update] Update wird eingespielt (${r.script}), Neustart: ${relaunch ? 'ja' : 'nein'}`);
+  update.status = 'installing';
+  return true;
+}
+
 // ---------- IPC ----------
 function registerIpc() {
   ipcMain.handle('settings:get', () => settings.get());
@@ -242,6 +284,17 @@ function registerIpc() {
   }));
   ipcMain.handle('system:resolutions', () => listResolutions());
   ipcMain.handle('net:interfaces', () => listInterfaces());
+
+  // --- Auto-Update ---
+  ipcMain.handle('update:get', () => updateView());
+  ipcMain.handle('update:check', () => runUpdateCheck(true));
+  ipcMain.handle('update:install', async () => {
+    if (gameWin) throw new Error('Bitte zuerst das laufende Spiel beenden.');
+    if (!installUpdate(true)) throw new Error('Kein Update bereit.');
+    await servers.stop();
+    if (party) await party.close();
+    app.exit(0);
+  });
 
   // --- Tailscale (Spielen übers Internet ohne Portfreigabe) ---
   ipcMain.handle('tailscale:status', () => tailscale.status());
@@ -323,6 +376,14 @@ async function runSelftest() {
     const ui = (js) => launcherWin.webContents.executeJavaScript(js);
     const shot = async (name, win = launcherWin) => fs.writeFileSync(path.join(outDir, name), (await win.webContents.capturePage()).toPNG());
     await wait(2500);
+    // Update-Test: `--selftest --update-test` mit LAGERFEUER_UPDATE_URL → prüfen, laden, entpacken, einspielen
+    if (process.argv.includes('--update-test')) {
+      const v = await runUpdateCheck(true);
+      log(`[Selbsttest] Update: ${JSON.stringify(v)}`);
+      if (v.status !== 'ready') selftestErrors.push(`Update nicht bereit: ${v.status} ${v.error || ''}`);
+      else installUpdate(false);
+      return finishSelftest(outDir);
+    }
     // Erststart-Frage zu Tailscale (eigenes, frisches Profil → muss erscheinen, außer Tailscale läuft schon)
     const tsState = await tailscale.status();
     const prompt = await ui("!document.getElementById('modal-backdrop').classList.contains('hidden') && document.querySelector('#modal h2')?.textContent || ''");
@@ -423,6 +484,15 @@ async function runSelftest() {
     await js('window.__gameViewmodel("shoot")');
     await wait(110);
     await shot('knife-slash.png', gameWin);
+    await js('window.__gameCamera(0, 1, 30, 0, 0, "mace")');
+    await wait(600);
+    await shot('mace.png', gameWin);
+    await js('window.__gameViewmodel("shoot"); window.__gameFx("wind")');
+    await wait(160);
+    await shot('mace-slam.png', gameWin);
+    await js('window.__gameFx("smash")');
+    await wait(120);
+    await shot('smash.png', gameWin);
     await js('window.__gameCamera(0, 1, 30, 0, 0, "shotgun"); document.getElementById("overlay").classList.add("hidden")');
     await wait(500);
     await js('window.__gameViewmodel("reload", 2.6)');
@@ -515,11 +585,18 @@ if (!SELFTEST && !app.requestSingleInstanceLock()) {
     registerIpc();
     createLauncherWindow();
     if (SELFTEST) runSelftest();
+    else if (settings.get().updates.auto) {
+      // Kurz nach dem Start und danach alle 6 Stunden nach Updates suchen (lädt im Hintergrund)
+      setTimeout(() => runUpdateCheck(false), 4000);
+      setInterval(() => runUpdateCheck(false), 6 * 60 * 60 * 1000);
+    }
   });
 
   app.on('window-all-closed', async () => {
     await servers?.stop();
     if (party) await party.close();
+    // Fertig geladenes Update beim Schließen automatisch einspielen (ohne Neustart)
+    if (!SELFTEST && update.status === 'ready') installUpdate(false);
     app.quit();
   });
 }

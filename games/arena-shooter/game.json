@@ -1,9 +1,9 @@
 {
   "id": "arena-shooter",
   "name": "Blumenfeld Arena",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "tagline": "Low-Poly-Ego-Shooter auf der Blumenwiese",
-  "description": "Jeder gegen jeden auf einer riesigen Blumenwiese mit Dorf, Scheunen, Wachtürmen und Ruinen. 7 Waffen vom Messer bis zum Raketenwerfer, Zielfernrohr per Rechtsklick, Item-Boxen mit Turbo-Pilz, Superstern, Blitz, Such-Kugel und Bananenschale – plus Chat (T) und Schleichen (Shift).",
+  "description": "Jeder gegen jeden auf einer riesigen Blumenwiese mit Dorf, Scheunen, Wachtürmen und Ruinen. 7 Waffen vom Messer bis zum Raketenwerfer, Zielfernrohr per Rechtsklick, Item-Boxen mit Turbo-Pilz, Superstern, Blitz, Such-Kugel und Bananenschale – plus Chat (T), Schleichen (Shift) und /mace (Streitkolben + Windladungen).",
   "client": "client/index.html",
   "server": "server/server.mjs",
   "icon": "icon.svg",

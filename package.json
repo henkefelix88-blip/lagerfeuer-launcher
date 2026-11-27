@@ -1,7 +1,7 @@
 {
   "name": "lagerfeuer-launcher",
   "productName": "Lagerfeuer Launcher",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Modularer Game-Launcher mit Party-System und 10 Spielen.",
   "main": "src/main/main.js",
   "author": "Lagerfeuer",
